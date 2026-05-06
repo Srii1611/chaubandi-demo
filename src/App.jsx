@@ -137,13 +137,19 @@ export default function App() {
         }
       `}</style>
 
-      {/* Announcement Ticker */}
-      <div style={{ background: "#1a1412", overflow: "hidden", padding: "10px 0", whiteSpace: "nowrap", flexShrink: 0 }}>
-        <div style={{ display: "inline-flex", animation: "marquee 28s linear infinite" }}>
+      {/* Announcement Marquee */}
+      <div style={{ background: "#1a1412", overflow: "hidden", padding: "11px 0", whiteSpace: "nowrap", flexShrink: 0 }}>
+        <div style={{ display: "inline-flex", animation: "marquee 35s linear infinite" }}>
           {[0, 1].map(i => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center", color: "#e8d9a8", fontSize: 11, letterSpacing: 2, textTransform: "uppercase" }}>
-              <span style={{ padding: "0 56px" }}>✦&nbsp;&nbsp;FREE SHIPPING ON ALL ORDERS ABOVE $249 USD</span>
-              <span style={{ padding: "0 56px" }}>✦&nbsp;&nbsp;SALE UPTO 50% OFF</span>
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", fontFamily: "'Outfit',sans-serif", color: "#e8d9a8", fontSize: 13, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              <span style={{ padding: "0 32px" }}>FREE SHIPPING ON ORDERS ABOVE $249</span>
+              <span>•</span>
+              <span style={{ padding: "0 32px" }}>SALE UPTO 50% OFF</span>
+              <span>•</span>
+              <span style={{ padding: "0 32px" }}>SHIPPING WORLDWIDE</span>
+              <span>•</span>
+              <span style={{ padding: "0 32px" }}>NEW ARRIVALS WEEKLY</span>
+              <span style={{ padding: "0 32px" }}>•</span>
             </span>
           ))}
         </div>
@@ -398,12 +404,49 @@ function HeroCarousel({ navigate, setShopFilter }) {
 /* ─── COUPLES SHOWCASE ─── */
 function CouplesShowcase({ navigate }) {
   const [activeIdx, setActiveIdx] = useState(0);
+  
+  // Updated with your new Kling AI images and matching outfit descriptions
   const PAIRINGS = [
-    { id: 1, theme: "The Royal Reception", image: "/Products/Couple/Screenshot 2026-05-05 013520.png", hers: { name: "Maroon Velvet Bridal Lehenga", price: 599 }, his: { name: "Black Embroidered Sherwani", price: 399 } },
-    { id: 2, theme: "Golden Hour Haldi", image: "/Products/Couple/Screenshot 2026-05-05 013654.png", hers: { name: "Gold Embroidered Anarkali", price: 279 }, his: { name: "Navy Silk Kurta Pajama", price: 189 } },
-    { id: 3, theme: "Emerald Mehandi", image: "/Products/Couple/Screenshot 2026-05-05 013804.png", hers: { name: "Emerald Sharara Set", price: 459 }, his: { name: "Black Embroidered Sherwani", price: 399 } },
-    { id: 4, theme: "Crimson Vows", image: "/Products/Couple/Screenshot 2026-05-05 013922.png", hers: { name: "Ivory Pearl Bridal Lehenga", price: 529 }, his: { name: "Black Embroidered Sherwani", price: 399 } },
-    { id: 5, theme: "Sangeet Night", image: "/Products/Couple/Screenshot 2026-05-05 014038.png", hers: { name: "Royal Blue Brocade Lehenga", price: 429 }, his: { name: "Navy Silk Kurta Pajama", price: 189 } },
+    {
+      id: 1,
+      theme: "Crimson Vows",
+      image: "/Products/Couple/img1.png",
+      objectPosition: "center center",
+      hers: { name: "Maroon Velvet Bridal Lehenga", price: 599 },
+      his: { name: "Maroon Embroidered Sherwani", price: 399 }
+    },
+    {
+      id: 2,
+      theme: "Sangeet Spectacular",
+      image: "/Products/Couple/img2.png",
+      objectPosition: "center 20%",
+      hers: { name: "Mustard Mirror-Work Lehenga", price: 429 },
+      his: { name: "Navy Blue Bandhgala Suit", price: 249 }
+    },
+    {
+      id: 3,
+      theme: "The Royal Reception",
+      image: "/Products/Couple/img3.png",
+      objectPosition: "center 15%",
+      hers: { name: "Navy Blue Silk Saree", price: 349 },
+      his: { name: "Black Velvet Jodhpuri Suit", price: 299 }
+    },
+    {
+      id: 4,
+      theme: "Emerald Mehandi",
+      image: "/Products/Couple/img4.png",
+      objectPosition: "center center",
+      hers: { name: "Emerald Green Silk Lehenga", price: 459 },
+      his: { name: "Cream Kurta & Green Jacket", price: 189 }
+    },
+    {
+      id: 5,
+      theme: "Nepali Heritage",
+      image: "/Products/Couple/img5.png",
+      objectPosition: "center 40%",
+      hers: { name: "Red Chaubandi Cholo & Saree", price: 319 },
+      his: { name: "Traditional Daura Suruwal", price: 159 }
+    },
   ];
 
   useEffect(() => {
@@ -417,10 +460,15 @@ function CouplesShowcase({ navigate }) {
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, marginBottom: 6 }}>Perfect Pairings</h2>
         <p style={{ fontSize: 13, color: "#7a6e64" }}>Curated matching sets for the bride and groom</p>
       </div>
-      <div style={{ position: "relative", height: 580, borderRadius: 12, overflow: "hidden", background: "#1a1412" }}>
+      <div style={{ position: "relative", height: "clamp(520px, 65vw, 820px)", borderRadius: 12, overflow: "hidden", background: "#1a1412" }}>
         {PAIRINGS.map((pair, idx) => (
           <div key={pair.id} style={{ position: "absolute", inset: 0, opacity: activeIdx === idx ? 1 : 0, transition: "opacity 1.2s ease-in-out", zIndex: activeIdx === idx ? 1 : 0 }}>
-            <img src={pair.image} alt={pair.theme} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            
+            {/* Added a fallback background color just in case img5 isn't ready yet */}
+            <div style={{ width: "100%", height: "100%", background: "#2a2420" }}>
+              <img src={pair.image} alt={pair.theme} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: pair.objectPosition || "center center", display: "block" }} />
+            </div>
+            
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.88) 100%)" }} />
             <div style={{ position: "absolute", top: 32, left: "50%", transform: "translateX(-50%)", background: "#fff", color: "#1a1412", padding: "10px 28px", borderRadius: 30, fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, zIndex: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.25)", whiteSpace: "nowrap" }}>{pair.theme}</div>
             <div className="mobile-stack" style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 40px 36px", display: "flex", gap: 40, zIndex: 2 }}>
@@ -440,50 +488,6 @@ function CouplesShowcase({ navigate }) {
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 24 }}>
         {PAIRINGS.map((_, idx) => <button key={idx} onClick={() => setActiveIdx(idx)} style={{ width: activeIdx === idx ? 24 : 8, height: 8, borderRadius: 10, border: "none", background: activeIdx === idx ? "#8b2c3a" : "#e2ddd6", cursor: "pointer", transition: "all 0.3s" }} />)}
-      </div>
-    </section>
-  );
-}
-
-/* ─── JEWELRY GALLERY (NON-SELLABLE) ─── */
-function JewelryGallery() {
-  const JEWELRY = [
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM.jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (1).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (2).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (3).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (4).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (5).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.36 AM (6).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.37 AM.jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.37 AM (1).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.37 AM (2).jpeg",
-    "/Products/Jewellery/WhatsApp Image 2026-05-05 at 1.00.37 AM (3).jpeg",
-  ];
-
-  return (
-    <section style={{ background: "#fff", padding: "80px 32px", borderTop: "1px solid #e2ddd6" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: 44 }}>
-          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12, fontWeight: 500 }}>Handpicked · In-Store Only</div>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, fontWeight: 400, marginBottom: 10 }}>Our Jewelry Collection</h2>
-          <p style={{ fontSize: 13, color: "#7a6e64", maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-            Statement pieces to complete your look. Visit our Arlington boutique to view and try on the full collection — or message Sushma to inquire.
-          </p>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
-          {JEWELRY.map((src, i) => (
-            <div key={i} className="hover-lift img-zoom" style={{ aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: "#f3efe9", cursor: "pointer" }}>
-              <img src={src} alt={`Jewelry piece ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            </div>
-          ))}
-        </div>
-        <div style={{ textAlign: "center", marginTop: 44 }}>
-          <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20see%20your%20jewelry%20collection.", "_blank")}
-            style={{ padding: "14px 36px", border: "1px solid #1a1412", background: "#fff", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, color: "#1a1412", fontFamily: "'Outfit',sans-serif" }}>
-            Inquire About Jewelry
-          </button>
-        </div>
       </div>
     </section>
   );
@@ -513,7 +517,8 @@ function UgcReels() {
         {REELS.map(reel => (            
           <div key={reel.id} onClick={() => setActiveVideo(reel)} onMouseEnter={handleEnter} onMouseLeave={handleLeave} className="hover-lift"              
             style={{ aspectRatio: "9/16", borderRadius: 8, background: reel.color, position: "relative", cursor: "pointer", overflow: "hidden" }}>              
-            <video src={reel.video} muted loop playsInline preload="metadata"                
+            <video src={reel.video} muted loop playsInline preload="metadata"
+              onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.1; }}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />              
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, pointerEvents: "none" }}>                
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.3)" }}>                  
@@ -698,7 +703,6 @@ function HomePage({ navigate, products, setShopFilter }) {
         </div>
       </section>
       <CouplesShowcase navigate={navigate} />
-      <JewelryGallery />
       <UgcReels />
       <TestimonialAndBooking />
       <FaqSection />
