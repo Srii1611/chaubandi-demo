@@ -1048,87 +1048,219 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
     </div>
   );
 }
+
 /* ─── LIVE VIDEO SHOPPING PAGE ─── */
 function LiveVideoPage({ navigate }) {
+  const [openFaq, setOpenFaq] = useState(null);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", country: "USA", date: "", time: "", app: "WhatsApp", occasion: "", notes: "" });
+  const [submitted, setSubmitted] = useState(false);
+
   const STEPS = [
-    { icon: "📅", title: "Book Your Slot", desc: "Choose a time that works for you. Sessions are free and last 20–30 minutes." },
-    { icon: "📲", title: "Get the WhatsApp Link", desc: "Sushma will send you a WhatsApp video call link before your appointment." },
-    { icon: "👗", title: "Shop Live Together", desc: "Browse the full collection in real time. See fabrics, colors, and embroidery up close." },
-    { icon: "📦", title: "We Ship to You", desc: "Place your order during or after the session. Free shipping, free alterations included." },
+    { num: "1", title: "Book Your Call", desc: "Fill the form or WhatsApp Sushma directly. Choose a date and time that works for you." },
+    { num: "2", title: "Meet Your Stylist", desc: "Join the video call. Sushma will show you pieces live — fabrics, embroidery, colors, all up close." },
+    { num: "3", title: "Customise & Pay", desc: "Pick your outfit, choose alterations, confirm measurements. Pay securely in your currency." },
+    { num: "4", title: "Worldwide Delivery", desc: "We pack and ship your order within 24–48 hours. Free shipping across the USA." },
+  ];
+
+  const REVIEWS = [
+    { name: "Priya M.", location: "New Jersey", stars: 5, text: "Sushma was incredibly patient. She showed me 8 different lehengas before I found the one. The video call made it feel like I was right there in the boutique." },
+    { name: "Meera J.", location: "Houston, TX", stars: 5, text: "Booked a bridal session and it was the best decision. She understood my vision completely — the zardozi work on my lehenga was exactly what I imagined." },
+    { name: "Anisha R.", location: "Toronto, Canada", stars: 5, text: "I was skeptical about buying a saree online, but the live call changed everything. I could see the drape, the shimmer, the border detail. Absolutely worth it." },
+    { name: "Kavya T.", location: "Boston, MA", stars: 5, text: "Even though I'm 10 minutes from the boutique I used the video call when I couldn't make it in person. So convenient and Sushma is so warm and knowledgeable." },
   ];
 
   const FAQS = [
-    { q: "Is the video shopping session free?", a: "Yes, completely free. No obligation to purchase." },
-    { q: "How long does a session take?", a: "Typically 20–30 minutes, but we take as long as you need." },
-    { q: "Which platform do you use?", a: "WhatsApp Video Call. No app download needed beyond WhatsApp." },
-    { q: "Can I shop for bridal wear via video?", a: "Absolutely. Our bridal sessions are among the most popular — Sushma will walk you through every detail." },
+    { q: "Is the video shopping session free?", a: "Yes, completely free. No obligation to purchase. We believe in earning your trust first." },
+    { q: "How long does a session take?", a: "Typically 20–30 minutes, but we take as long as you need. Bridal sessions can go up to 60 minutes." },
+    { q: "Which platforms do you support?", a: "WhatsApp Video Call, Zoom, Google Meet, and FaceTime. We use whatever works best for you." },
+    { q: "Can I shop for bridal wear via video?", a: "Absolutely. Our bridal sessions are among the most popular. Sushma will walk you through every detail of the collection and help you build your complete bridal look." },
+    { q: "How do I pay after the session?", a: "We'll send you a secure payment link via WhatsApp or email. We accept all major cards, PayPal, and Zelle." },
+    { q: "Can I bring family members to the call?", a: "Yes! Many customers invite their mom, sister, or friends to join the call. The more the merrier." },
+    { q: "What if I need alterations?", a: "All purchases come with free alterations. We'll guide you through taking your measurements during or after the call." },
+    { q: "Do you ship internationally?", a: "Yes. We ship across the USA (free shipping) and internationally. Sushma will confirm shipping costs for your country during the session." },
   ];
 
-  const [openFaq, setOpenFaq] = useState(null);
+  const CATEGORIES = [
+    { label: "Bridal Lehengas", color: "linear-gradient(160deg,#3a0818,#6a1830)", img: "/Products/Lehenga/WhatsApp Image 2026-05-05 at 12.20.33 AM.jpeg" },
+    { label: "Sarees", color: "linear-gradient(160deg,#5a0a0a,#8a1a1a)", img: "/Products/Sarees/WhatsApp Image 2026-05-05 at 1.07.53 AM.jpeg" },
+    { label: "Sherwanis", color: "linear-gradient(160deg,#0c0a09,#2a2420)", img: "" },
+  ];
+
+  const handleSubmit = () => {
+    const msg = `Hi Sushma! I'd like to book a Live Video Shopping session.%0AName: ${form.name}%0AEmail: ${form.email}%0APhone: ${form.phone}%0ADate: ${form.date}%0ATime: ${form.time}%0APlatform: ${form.app}%0AOccasion: ${form.occasion}%0ANotes: ${form.notes}`;
+    window.open(`https://wa.me/18578001282?text=${msg}`, "_blank");
+    setSubmitted(true);
+  };
+
+  const inputStyle = { width: "100%", height: 44, border: "1px solid #e2ddd6", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13, outline: "none", background: "#fff", color: "#1a1412" };
+  const labelStyle = { fontSize: 11, letterSpacing: 1, color: "#7a6e64", display: "block", marginBottom: 5, textTransform: "uppercase" };
 
   return (
     <div className="fade-in">
-      {/* Hero */}
-      <div style={{ background: "linear-gradient(135deg, #0a101d 0%, #1a2040 50%, #0a101d 100%)", padding: "80px 32px", textAlign: "center" }}>
-        <div style={{ maxWidth: 700, margin: "0 auto" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,106,58,0.2)", border: "1px solid rgba(42,106,58,0.4)", borderRadius: 100, padding: "6px 18px", marginBottom: 24 }}>
+
+      {/* ── HERO ── */}
+      <div style={{ background: "linear-gradient(135deg,#0a101d 0%,#1a2040 50%,#0a101d 100%)", padding: "72px 32px 64px", textAlign: "center" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,106,58,.18)", border: "1px solid rgba(42,106,58,.4)", borderRadius: 100, padding: "6px 18px", marginBottom: 24 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#2a6a3a", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
-            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Now Available</span>
+            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Free · No Obligation</span>
           </div>
-          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px, 5vw, 64px)", fontWeight: 300, color: "#f0ebe4", lineHeight: 1.1, marginBottom: 20 }}>Shop Chaubandi<br /><span style={{ color: "#c5a255", fontStyle: "italic" }}>Live, From Anywhere</span></h1>
-          <p style={{ fontSize: 15, color: "rgba(240,235,228,0.7)", lineHeight: 1.8, marginBottom: 36, maxWidth: 520, margin: "0 auto 36px" }}>
-            Can't make it to Arlington? No problem. Book a free one-on-one video shopping session with Sushma and browse our full collection in real time — from your phone, anywhere in the world.
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(38px,5vw,68px)", fontWeight: 300, color: "#f0ebe4", lineHeight: 1.1, marginBottom: 16 }}>
+            Shop Chaubandi<br /><em style={{ color: "#c5a255" }}>Live. From Anywhere.</em>
+          </h1>
+          <p style={{ fontSize: 15, color: "rgba(240,235,228,.7)", lineHeight: 1.8, maxWidth: 540, margin: "0 auto 16px" }}>
+            A free one-on-one video session with Sushma. See every fabric, every embroidery detail, every drape — live on your screen. Then we ship it to your door.
           </p>
-          <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
-            style={{ padding: "16px 48px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
-            Book a Free Session
-          </button>
-          <div style={{ marginTop: 16, fontSize: 12, color: "rgba(240,235,228,0.4)", letterSpacing: 1 }}>Via WhatsApp · No download required</div>
-        </div>
-      </div>
-
-      {/* How It Works */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 32px" }}>
-        <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>How It Works</h2>
-          <p style={{ fontSize: 13, color: "#7a6e64" }}>Four simple steps to your perfect outfit</p>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 32 }}>
-          {STEPS.map((step, i) => (
-            <div key={i} style={{ textAlign: "center", padding: "32px 24px", background: "#fff", border: "1px solid #e2ddd6", borderRadius: 8 }}>
-              <div style={{ fontSize: 36, marginBottom: 16 }}>{step.icon}</div>
-              <div style={{ fontSize: 10, letterSpacing: 2, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Step {i + 1}</div>
-              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 400, marginBottom: 10 }}>{step.title}</h3>
-              <p style={{ fontSize: 13, color: "#7a6e64", lineHeight: 1.7 }}>{step.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Why Live Shopping */}
-      <div style={{ background: "#faf8f5", borderTop: "1px solid #e2ddd6", borderBottom: "1px solid #e2ddd6", padding: "80px 32px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }} className="mobile-stack">
-          <div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 20, lineHeight: 1.2 }}>Why Shop Via<br /><span style={{ fontStyle: "italic", color: "#8b2c3a" }}>Video Call?</span></h2>
-            <p style={{ fontSize: 14, color: "#7a6e64", lineHeight: 1.8, marginBottom: 24 }}>
-              Ethnic wear is deeply personal. The weight of the fabric, the shine of the zari, the fall of a lehenga — these things are impossible to judge from a photo alone. A live session with Sushma gives you the boutique experience, wherever you are.
-            </p>
-            <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
-              style={{ padding: "14px 36px", background: "#1a1412", color: "#fff", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
-              Book Now — It's Free
+          <div style={{ display: "flex", justifyContent: "center", gap: 32, marginBottom: 36, flexWrap: "wrap" }}>
+            {["Personal Stylist on Every Call", "See Real Stock Live", "Ships Worldwide", "Free Alterations Included"].map(t => (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(240,235,228,.55)", letterSpacing: .5 }}>
+                <span style={{ color: "#c5a255" }}>✓</span> {t}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn-shine" onClick={() => document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" })}
+              style={{ padding: "15px 40px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
+              Book Free Session
+            </button>
+            <button onClick={() => window.open("https://wa.me/18578001282", "_blank")}
+              style={{ padding: "15px 40px", background: "transparent", color: "#f0ebe4", border: "1px solid rgba(240,235,228,.3)", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
+              WhatsApp Sushma
             </button>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {[["👁", "See Every Detail Live", "Zoom in on embroidery, check fabric weight, compare colors in real light."],
-              ["🎨", "Personalised Styling", "Sushma curates outfits based on your occasion, skin tone, and budget."],
-              ["✂️", "Free Alterations Included", "Every purchase comes with complimentary expert alterations."],
-              ["🌍", "Available Worldwide", "We ship across the USA and internationally. Distance is no barrier."]
-            ].map(([icon, title, desc]) => (
-              <div key={title} style={{ display: "flex", gap: 16, padding: "16px 20px", background: "#fff", borderRadius: 8, border: "1px solid #e2ddd6" }}>
-                <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+          <div style={{ marginTop: 20, fontSize: 12, color: "rgba(240,235,228,.3)" }}>📞 857-800-1282 · Available Tue–Sun</div>
+        </div>
+      </div>
+
+      {/* ── HOW IT WORKS ── */}
+      <div style={{ background: "#fff", padding: "80px 32px", borderBottom: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 52 }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Simple Process</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400 }}>How Live Video Shopping Works</h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 24 }} className="mobile-grid">
+            {STEPS.map((s, i) => (
+              <div key={i} style={{ textAlign: "center", padding: "32px 20px", position: "relative" }}>
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#1a1412", color: "#c5a255", fontFamily: "'Cormorant Garamond',serif", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>{s.num}</div>
+                {i < 3 && <div className="mobile-hide" style={{ position: "absolute", top: 52, left: "75%", width: "50%", height: 1, background: "#e2ddd6" }} />}
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, fontWeight: 400, marginBottom: 10 }}>{s.title}</h3>
+                <p style={{ fontSize: 12, color: "#7a6e64", lineHeight: 1.7 }}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── BOOKING FORM + CONTACT ── */}
+      <div id="booking-form" style={{ background: "#faf8f5", padding: "80px 32px", borderBottom: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 56, alignItems: "start" }} className="mobile-stack">
+
+          {/* Form */}
+          <div style={{ background: "#fff", border: "1px solid #e2ddd6", borderRadius: 10, padding: "40px 36px" }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Free · No Commitment</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, marginBottom: 6 }}>Book Your Private<br />Video Shopping Call</h2>
+            <p style={{ fontSize: 12, color: "#7a6e64", marginBottom: 28, lineHeight: 1.6 }}>Fill in your details and Sushma will confirm your slot via WhatsApp within a few hours.</p>
+
+            {submitted ? (
+              <div style={{ textAlign: "center", padding: "40px 0" }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, marginBottom: 8 }}>Request Sent!</h3>
+                <p style={{ fontSize: 13, color: "#7a6e64" }}>Sushma will confirm your slot on WhatsApp soon.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div><label style={labelStyle}>Full Name *</label><input style={inputStyle} placeholder="Your name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+                  <div><label style={labelStyle}>Email *</label><input style={inputStyle} placeholder="you@email.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div><label style={labelStyle}>Mobile Number *</label><input style={inputStyle} placeholder="+1 (xxx) xxx-xxxx" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+                  <div><label style={labelStyle}>Country</label>
+                    <select style={{...inputStyle}} value={form.country} onChange={e => setForm({...form, country: e.target.value})}>
+                      {["USA","Canada","UK","Australia","India","Other"].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div><label style={labelStyle}>Preferred Date</label><input type="date" style={inputStyle} value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
+                  <div><label style={labelStyle}>Preferred Time (EST)</label>
+                    <select style={inputStyle} value={form.time} onChange={e => setForm({...form, time: e.target.value})}>
+                      <option value="">Select Time</option>
+                      {["10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM","6:00 PM","7:00 PM"].map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div><label style={labelStyle}>Preferred Video Call App</label>
+                  <select style={inputStyle} value={form.app} onChange={e => setForm({...form, app: e.target.value})}>
+                    {["WhatsApp","Zoom","Google Meet","FaceTime"].map(a => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelStyle}>What do you want to shop?</label>
+                  <select style={inputStyle} value={form.occasion} onChange={e => setForm({...form, occasion: e.target.value})}>
+                    <option value="">Select occasion / category</option>
+                    {["Bridal Lehenga","Wedding Guest Outfit","Saree","Sherwani / Men's Wear","Sangeet / Mehandi Outfit","Reception Gown","Kids Wear","General Browsing"].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelStyle}>Anything else? (optional)</label>
+                  <textarea style={{...inputStyle, height: 80, padding: "10px 14px", resize: "none"}} placeholder="Budget, colors, specific occasions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                </div>
+                <button className="btn-shine" onClick={handleSubmit}
+                  style={{ width: "100%", height: 52, background: "#1a1412", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4, marginTop: 4 }}>
+                  Submit & Open WhatsApp
+                </button>
+                <p style={{ fontSize: 10, color: "#b0a89e", textAlign: "center", letterSpacing: .3 }}>100% private · No fees · No commitment</p>
+              </div>
+            )}
+          </div>
+
+          {/* Contact Side */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div>
+              <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Prefer Direct Call?</div>
+              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 400, marginBottom: 20 }}>Reach Us Directly</h3>
+            </div>
+            {[
+              { icon: "💬", label: "WhatsApp", value: "+1 (857) 800-1282", action: () => window.open("https://wa.me/18578001282","_blank") },
+              { icon: "📞", label: "Call Us", value: "+1 (857) 800-1282", action: () => window.open("tel:+18578001282") },
+              { icon: "📍", label: "Boutique", value: "177 Massachusetts Ave, Arlington, MA", action: null },
+              { icon: "🕐", label: "Hours", value: "Tue – Sun · 11am to 7pm EST", action: null },
+            ].map(({ icon, label, value, action }) => (
+              <div key={label} onClick={action} style={{ display: "flex", gap: 16, padding: "18px 20px", background: "#fff", border: "1px solid #e2ddd6", borderRadius: 8, cursor: action ? "pointer" : "default", transition: "border-color .2s" }}
+                onMouseEnter={e => action && (e.currentTarget.style.borderColor = "#8b2c3a")} onMouseLeave={e => action && (e.currentTarget.style.borderColor = "#e2ddd6")}>
+                <span style={{ fontSize: 22 }}>{icon}</span>
                 <div>
-                  <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 3 }}>{title}</div>
-                  <div style={{ fontSize: 12, color: "#7a6e64", lineHeight: 1.6 }}>{desc}</div>
+                  <div style={{ fontSize: 10, letterSpacing: 1.5, color: "#b0a89e", textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 14, color: "#1a1412", fontWeight: 400 }}>{value}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{ background: "#1a1412", borderRadius: 8, padding: "24px 20px", textAlign: "center" }}>
+              <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, color: "#c5a255", marginBottom: 6 }}>4.9 ★★★★★</div>
+              <div style={{ fontSize: 12, color: "rgba(240,235,228,.6)" }}>Based on 200+ happy customers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── FEATURED CATEGORIES ── */}
+      <div style={{ background: "#fff", padding: "80px 32px", borderBottom: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 40 }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, fontWeight: 400, marginBottom: 6 }}>Shop These Categories Live</h2>
+            <p style={{ fontSize: 13, color: "#7a6e64" }}>Browse our most popular collections during your video call</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
+            {CATEGORIES.map(({ label, color, img }) => (
+              <div key={label} className="hover-lift" style={{ position: "relative", aspectRatio: "4/5", borderRadius: 8, overflow: "hidden", cursor: "pointer", background: color }}
+                onClick={() => document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" })}>
+                {img && <img src={img} alt={label} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,.8) 0%, transparent 50%)" }} />
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 24 }}>
+                  <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, color: "#fff", marginBottom: 10 }}>{label}</h3>
+                  <div style={{ display: "inline-block", padding: "8px 20px", background: "#c5a255", color: "#1a1412", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, cursor: "pointer" }}>
+                    Book Live Session
+                  </div>
                 </div>
               </div>
             ))}
@@ -1136,34 +1268,76 @@ function LiveVideoPage({ navigate }) {
         </div>
       </div>
 
-      {/* FAQ */}
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "80px 32px" }}>
-        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, textAlign: "center", marginBottom: 40 }}>Common Questions</h2>
-        <div style={{ borderTop: "1px solid #e2ddd6" }}>
-          {FAQS.map((faq, idx) => (
-            <div key={idx} style={{ borderBottom: "1px solid #e2ddd6" }}>
-              <button onClick={() => setOpenFaq(openFaq === idx ? null : idx)} style={{ width: "100%", padding: "20px 0", background: "none", border: "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left" }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1412" }}>{faq.q}</span>
-                <Plus size={16} style={{ color: "#c5a255", flexShrink: 0, transform: openFaq === idx ? "rotate(45deg)" : "rotate(0)", transition: "transform 0.3s" }} />
-              </button>
-              <div style={{ maxHeight: openFaq === idx ? 120 : 0, overflow: "hidden", transition: "max-height 0.3s ease" }}>
-                <p style={{ paddingBottom: 20, fontSize: 13, color: "#7a6e64", lineHeight: 1.7 }}>{faq.a}</p>
+      {/* ── REVIEWS ── */}
+      <div style={{ background: "#faf8f5", padding: "80px 32px", borderBottom: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Real Customers</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, fontWeight: 400 }}>What Our Clients Say</h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 20 }} className="mobile-grid">
+            {REVIEWS.map((r, i) => (
+              <div key={i} style={{ background: "#fff", border: "1px solid #e2ddd6", borderRadius: 8, padding: "28px 28px" }}>
+                <div style={{ color: "#c5a255", fontSize: 14, letterSpacing: 2, marginBottom: 14 }}>★★★★★</div>
+                <p style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 17, fontStyle: "italic", color: "#1a1412", lineHeight: 1.7, marginBottom: 16 }}>"{r.text}"</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</div>
+                  <div style={{ fontSize: 11, color: "#b0a89e", letterSpacing: .5 }}>{r.location}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* CTA Banner */}
-      <div style={{ background: "#1a1412", padding: "64px 32px", textAlign: "center" }}>
-        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, color: "#f0ebe4", fontWeight: 300, marginBottom: 12 }}>Ready to Shop Live?</h2>
-        <p style={{ fontSize: 14, color: "rgba(240,235,228,0.6)", marginBottom: 32 }}>Message Sushma on WhatsApp to pick your time slot.</p>
-        <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
-          style={{ padding: "16px 48px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
-          WhatsApp Sushma
-        </button>
-        <div style={{ marginTop: 24, fontSize: 12, color: "rgba(240,235,228,0.3)", cursor: "pointer" }} onClick={() => navigate("home")}>← Back to Home</div>
+      {/* ── FAQ ── */}
+      <div style={{ background: "#fff", padding: "80px 32px", borderBottom: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 44 }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, fontWeight: 400, marginBottom: 6 }}>Frequently Asked Questions</h2>
+            <p style={{ fontSize: 13, color: "#7a6e64" }}>Everything you need to know about Live Video Shopping</p>
+          </div>
+          <div style={{ borderTop: "1px solid #e2ddd6" }}>
+            {FAQS.map((faq, idx) => (
+              <div key={idx} style={{ borderBottom: "1px solid #e2ddd6" }}>
+                <button onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  style={{ width: "100%", padding: "20px 0", background: "none", border: "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", gap: 16 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1412", lineHeight: 1.4 }}>{faq.q}</span>
+                  <Plus size={16} style={{ color: "#c5a255", flexShrink: 0, transform: openFaq === idx ? "rotate(45deg)" : "rotate(0)", transition: "transform .3s" }} />
+                </button>
+                <div style={{ maxHeight: openFaq === idx ? 200 : 0, overflow: "hidden", transition: "max-height .35s ease" }}>
+                  <p style={{ paddingBottom: 20, fontSize: 13, color: "#7a6e64", lineHeight: 1.75 }}>{faq.a}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* ── FINAL CTA ── */}
+      <div style={{ background: "#1a1412", padding: "80px 32px", textAlign: "center" }}>
+        <div style={{ maxWidth: 600, margin: "0 auto" }}>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 13, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 16 }}>Knots of Tradition</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(32px,4vw,52px)", color: "#f0ebe4", fontWeight: 300, marginBottom: 16, lineHeight: 1.2 }}>
+            Your Perfect Outfit<br /><em style={{ color: "#c5a255" }}>Is One Call Away</em>
+          </h2>
+          <p style={{ fontSize: 14, color: "rgba(240,235,228,.55)", marginBottom: 36, lineHeight: 1.7 }}>
+            Free session. No pressure. Just Sushma, your style, and a full boutique on your screen.
+          </p>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn-shine" onClick={() => document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" })}
+              style={{ padding: "15px 40px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
+              Book Free Session
+            </button>
+            <button onClick={() => window.open("https://wa.me/18578001282","_blank")}
+              style={{ padding: "15px 40px", background: "transparent", color: "#f0ebe4", border: "1px solid rgba(240,235,228,.3)", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+              WhatsApp Sushma
+            </button>
+          </div>
+          <div style={{ marginTop: 32, fontSize: 12, color: "rgba(240,235,228,.25)", cursor: "pointer" }} onClick={() => navigate("home")}>← Back to Home</div>
+        </div>
+      </div>
+
     </div>
   );
 }
