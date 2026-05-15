@@ -156,11 +156,11 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#fff", borderBottom: "1px solid #e2ddd6", flexShrink: 0, position: "sticky", top: 0, zIndex: 1000 }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 120, display: "flex", alignItems: "center", gap: 24 }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 88, display: "flex", alignItems: "center", gap: 24 }}>
 
           {/* Logo — LEFT */}
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => navigate("home")}>
-            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 120, width: "auto", display: "block" }} />
+            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 80, width: "auto", display: "block" }} />
           </div>
 
           {/* Nav — beside logo */}
@@ -172,6 +172,10 @@ export default function App() {
                 {item}
               </span>
             ))}
+            <span onClick={() => navigate("live")} style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#2a6a3a", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#2a6a3a", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
+              LIVE VIDEO SHOPPING
+            </span>
             <span onClick={() => navigate("shop")} style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#8b2c3a", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
               SALE
             </span>
@@ -268,6 +272,7 @@ export default function App() {
         {page === "shop" && <ShopPage navigate={navigate} products={PRODUCTS} filter={shopFilter} setFilter={setShopFilter} addToCart={addToCart} />}
         {page === "product" && selectedProduct && <ProductPage product={selectedProduct} navigate={navigate} addToCart={addToCart} products={PRODUCTS} />}
         {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} />}
+        {page === "live" && <LiveVideoPage navigate={navigate} />}
       </main>
 
       {/* Global Footer */}
@@ -1039,6 +1044,125 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
             🔒 Secure checkout · Free shipping within USA · Free alterations included · Ships 24–48 hours
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+/* ─── LIVE VIDEO SHOPPING PAGE ─── */
+function LiveVideoPage({ navigate }) {
+  const STEPS = [
+    { icon: "📅", title: "Book Your Slot", desc: "Choose a time that works for you. Sessions are free and last 20–30 minutes." },
+    { icon: "📲", title: "Get the WhatsApp Link", desc: "Sushma will send you a WhatsApp video call link before your appointment." },
+    { icon: "👗", title: "Shop Live Together", desc: "Browse the full collection in real time. See fabrics, colors, and embroidery up close." },
+    { icon: "📦", title: "We Ship to You", desc: "Place your order during or after the session. Free shipping, free alterations included." },
+  ];
+
+  const FAQS = [
+    { q: "Is the video shopping session free?", a: "Yes, completely free. No obligation to purchase." },
+    { q: "How long does a session take?", a: "Typically 20–30 minutes, but we take as long as you need." },
+    { q: "Which platform do you use?", a: "WhatsApp Video Call. No app download needed beyond WhatsApp." },
+    { q: "Can I shop for bridal wear via video?", a: "Absolutely. Our bridal sessions are among the most popular — Sushma will walk you through every detail." },
+  ];
+
+  const [openFaq, setOpenFaq] = useState(null);
+
+  return (
+    <div className="fade-in">
+      {/* Hero */}
+      <div style={{ background: "linear-gradient(135deg, #0a101d 0%, #1a2040 50%, #0a101d 100%)", padding: "80px 32px", textAlign: "center" }}>
+        <div style={{ maxWidth: 700, margin: "0 auto" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,106,58,0.2)", border: "1px solid rgba(42,106,58,0.4)", borderRadius: 100, padding: "6px 18px", marginBottom: 24 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#2a6a3a", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
+            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Now Available</span>
+          </div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px, 5vw, 64px)", fontWeight: 300, color: "#f0ebe4", lineHeight: 1.1, marginBottom: 20 }}>Shop Chaubandi<br /><span style={{ color: "#c5a255", fontStyle: "italic" }}>Live, From Anywhere</span></h1>
+          <p style={{ fontSize: 15, color: "rgba(240,235,228,0.7)", lineHeight: 1.8, marginBottom: 36, maxWidth: 520, margin: "0 auto 36px" }}>
+            Can't make it to Arlington? No problem. Book a free one-on-one video shopping session with Sushma and browse our full collection in real time — from your phone, anywhere in the world.
+          </p>
+          <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
+            style={{ padding: "16px 48px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
+            Book a Free Session
+          </button>
+          <div style={{ marginTop: 16, fontSize: 12, color: "rgba(240,235,228,0.4)", letterSpacing: 1 }}>Via WhatsApp · No download required</div>
+        </div>
+      </div>
+
+      {/* How It Works */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 32px" }}>
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>How It Works</h2>
+          <p style={{ fontSize: 13, color: "#7a6e64" }}>Four simple steps to your perfect outfit</p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 32 }}>
+          {STEPS.map((step, i) => (
+            <div key={i} style={{ textAlign: "center", padding: "32px 24px", background: "#fff", border: "1px solid #e2ddd6", borderRadius: 8 }}>
+              <div style={{ fontSize: 36, marginBottom: 16 }}>{step.icon}</div>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Step {i + 1}</div>
+              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 400, marginBottom: 10 }}>{step.title}</h3>
+              <p style={{ fontSize: 13, color: "#7a6e64", lineHeight: 1.7 }}>{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Why Live Shopping */}
+      <div style={{ background: "#faf8f5", borderTop: "1px solid #e2ddd6", borderBottom: "1px solid #e2ddd6", padding: "80px 32px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }} className="mobile-stack">
+          <div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 20, lineHeight: 1.2 }}>Why Shop Via<br /><span style={{ fontStyle: "italic", color: "#8b2c3a" }}>Video Call?</span></h2>
+            <p style={{ fontSize: 14, color: "#7a6e64", lineHeight: 1.8, marginBottom: 24 }}>
+              Ethnic wear is deeply personal. The weight of the fabric, the shine of the zari, the fall of a lehenga — these things are impossible to judge from a photo alone. A live session with Sushma gives you the boutique experience, wherever you are.
+            </p>
+            <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
+              style={{ padding: "14px 36px", background: "#1a1412", color: "#fff", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+              Book Now — It's Free
+            </button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {[["👁", "See Every Detail Live", "Zoom in on embroidery, check fabric weight, compare colors in real light."],
+              ["🎨", "Personalised Styling", "Sushma curates outfits based on your occasion, skin tone, and budget."],
+              ["✂️", "Free Alterations Included", "Every purchase comes with complimentary expert alterations."],
+              ["🌍", "Available Worldwide", "We ship across the USA and internationally. Distance is no barrier."]
+            ].map(([icon, title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 16, padding: "16px 20px", background: "#fff", borderRadius: 8, border: "1px solid #e2ddd6" }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 3 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#7a6e64", lineHeight: 1.6 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={{ maxWidth: 700, margin: "0 auto", padding: "80px 32px" }}>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, textAlign: "center", marginBottom: 40 }}>Common Questions</h2>
+        <div style={{ borderTop: "1px solid #e2ddd6" }}>
+          {FAQS.map((faq, idx) => (
+            <div key={idx} style={{ borderBottom: "1px solid #e2ddd6" }}>
+              <button onClick={() => setOpenFaq(openFaq === idx ? null : idx)} style={{ width: "100%", padding: "20px 0", background: "none", border: "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1412" }}>{faq.q}</span>
+                <Plus size={16} style={{ color: "#c5a255", flexShrink: 0, transform: openFaq === idx ? "rotate(45deg)" : "rotate(0)", transition: "transform 0.3s" }} />
+              </button>
+              <div style={{ maxHeight: openFaq === idx ? 120 : 0, overflow: "hidden", transition: "max-height 0.3s ease" }}>
+                <p style={{ paddingBottom: 20, fontSize: 13, color: "#7a6e64", lineHeight: 1.7 }}>{faq.a}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA Banner */}
+      <div style={{ background: "#1a1412", padding: "64px 32px", textAlign: "center" }}>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, color: "#f0ebe4", fontWeight: 300, marginBottom: 12 }}>Ready to Shop Live?</h2>
+        <p style={{ fontSize: 14, color: "rgba(240,235,228,0.6)", marginBottom: 32 }}>Message Sushma on WhatsApp to pick your time slot.</p>
+        <button className="btn-shine" onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20would%20like%20to%20book%20a%20Live%20Video%20Shopping%20session.", "_blank")}
+          style={{ padding: "16px 48px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
+          WhatsApp Sushma
+        </button>
+        <div style={{ marginTop: 24, fontSize: 12, color: "rgba(240,235,228,0.3)", cursor: "pointer" }} onClick={() => navigate("home")}>← Back to Home</div>
       </div>
     </div>
   );
