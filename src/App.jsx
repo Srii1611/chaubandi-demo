@@ -171,7 +171,7 @@ export default function App() {
           </nav>
           
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => navigate("home")}>
-            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 64, width: "auto", display: "block" }} />
+            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 80, width: "auto", display: "block" }} />
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: 18, flex: 1, justifyContent: "flex-end" }}>
