@@ -156,7 +156,7 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#fff", borderBottom: "1px solid #e2ddd6", flexShrink: 0, position: "relative", zIndex: 1000 }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 72, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 120, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <nav className="mobile-hide" style={{ display: "flex", alignItems: "center", gap: 22, flex: 1 }}>
             {["WOMEN", "MEN", "KIDS", "ACCESSORIES", "ABOUT US"].map(item => (
               <span key={item} onClick={() => navigate("shop")}
@@ -171,7 +171,7 @@ export default function App() {
           </nav>
           
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => navigate("home")}>
-            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 80, width: "auto", display: "block" }} />
+            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 120, width: "auto", display: "block" }} />
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: 18, flex: 1, justifyContent: "flex-end" }}>
