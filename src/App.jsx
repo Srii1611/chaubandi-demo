@@ -156,11 +156,11 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#fff", borderBottom: "1px solid #e2ddd6", flexShrink: 0, position: "sticky", top: 0, zIndex: 1000 }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 88, display: "flex", alignItems: "center", gap: 24 }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 24px", height: 120, display: "flex", alignItems: "center", gap: 24 }}>
 
           {/* Logo — LEFT */}
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => navigate("home")}>
-            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 80, width: "auto", display: "block" }} />
+            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 120, width: "auto", display: "block" }} />
           </div>
 
           {/* Nav — beside logo */}
