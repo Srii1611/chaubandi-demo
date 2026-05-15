@@ -167,12 +167,12 @@ export default function App() {
           <nav className="mobile-hide" style={{ display: "flex", alignItems: "center", gap: 24, flexShrink: 0 }}>
             {["WOMEN", "MEN", "KIDS", "ACCESSORIES", "ABOUT US"].map(item => (
               <span key={item} onClick={() => navigate("shop")}
-                style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a6e64", cursor: "pointer", fontWeight: 400, transition: "color .3s", whiteSpace: "nowrap" }}
+                style={{ fontSize: 16, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a6e64", cursor: "pointer", fontWeight: 400, transition: "color .3s", whiteSpace: "nowrap" }}
                 onMouseEnter={e => e.target.style.color = "#1a1412"} onMouseLeave={e => e.target.style.color = "#7a6e64"}>
                 {item}
               </span>
             ))}
-            <span onClick={() => navigate("live")} style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#2a6a3a", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5 }}>
+            <span onClick={() => navigate("live")} style={{ fontSize: 16, letterSpacing: 1.5, textTransform: "uppercase", color: "#2a6a3a", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#2a6a3a", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
               LIVE VIDEO SHOPPING
             </span>
@@ -183,7 +183,7 @@ export default function App() {
 
           {/* Search — wide, center */}
           <div style={{ flex: 1, display: "flex", alignItems: "center", position: "relative" }} className="mobile-hide">
-            <Search size={15} style={{ position: "absolute", left: 14, color: "#b0a89e", pointerEvents: "none" }} />
+            <Search size={18} style={{ position: "absolute", left: 14, color: "#b0a89e", pointerEvents: "none" }} />
             <input placeholder="What are you looking for?" style={{ width: "100%", height: 42, paddingLeft: 40, paddingRight: 16, border: "1.5px solid #e2ddd6", borderRadius: 6, fontSize: 12, color: "#1a1412", background: "#faf8f5", outline: "none", fontFamily: "'Outfit',sans-serif", letterSpacing: .3 }}
               onFocus={e => e.target.style.borderColor = "#8b2c3a"} onBlur={e => e.target.style.borderColor = "#e2ddd6"} />
           </div>
