@@ -561,11 +561,12 @@ function UgcReels() {
 /* ─── TESTIMONIAL MARQUEE & BOOKING BANNER ─── */
 function TestimonialAndBooking() {
   const REVIEWS = [
-    { text: "Absolutely stunning. The embroidery detail is incredible.", author: "Priya M." },
-    { text: "Sushma understood exactly what I wanted for my wedding.", author: "Meera J." },
-    { text: "Best lehenga I own. Never seen anything like it in Boston.", author: "Sneha K." },
-    { text: "Lightweight and comfortable all evening. Free alterations was a huge bonus!", author: "Anisha R." },
-    { text: "The patchwork design is unique. Warm boutique experience.", author: "Kavya T." }
+    { text: "Sushma was absolutely wonderful to work with. We got all of our outfits for our wedding events from her — my Haldi lehenga, wedding ceremony dress, jewelry, and shoes.", author: "Sarah R." },
+    { text: "I found a gorgeous lehenga in under 15 minutes. It only needed a small alteration, which the lovely lady at the store took care of right away. Prices are very fair!", author: "Thili B." },
+    { text: "Sushma is so kind and absolutely amazing at what she does! I've kept coming back with different family members. So grateful to have found her. 10/10", author: "Nisha M." },
+    { text: "Such a beautiful selection with many custom sizes — I didn't even have to get my lehenga altered and I usually do! She is very friendly, knowledgeable, and talented.", author: "Sukrana U." },
+    { text: "My daughter and I traveled 3.5 hours from Vermont. The shop is bright, colorful and filled with so many options. Sushma is incredibly talented and kind.", author: "Cindy S." },
+    { text: "I never write Google reviews, but my experience with Chaubandi and Sushma was so wonderful that this is the least I can do.", author: "Kyle V." },
   ];
 
   return (
@@ -1061,10 +1062,10 @@ function LiveVideoPage({ navigate }) {
   ];
 
   const REVIEWS = [
-    { name: "Priya M.", location: "New Jersey", stars: 5, text: "Sushma was incredibly patient. She showed me 8 different lehengas before I found the one. The video call made it feel like I was right there in the boutique." },
-    { name: "Meera J.", location: "Houston, TX", stars: 5, text: "Booked a bridal session and it was the best decision. She understood my vision completely — the zardozi work on my lehenga was exactly what I imagined." },
-    { name: "Anisha R.", location: "Toronto, Canada", stars: 5, text: "I was skeptical about buying a saree online, but the live call changed everything. I could see the drape, the shimmer, the border detail. Absolutely worth it." },
-    { name: "Kavya T.", location: "Boston, MA", stars: 5, text: "Even though I'm 10 minutes from the boutique I used the video call when I couldn't make it in person. So convenient and Sushma is so warm and knowledgeable." },
+    { name: "Sarah Rollman", location: "Google Review ★★★★★", text: "Sushma was absolutely wonderful to work with. We got all of our outfits for our wedding events from her, including my Haldi lehenga, my wedding ceremony dress, jewelry, and shoes. Highly recommend!" },
+    { name: "Zephry Wright", location: "Google Review ★★★★★", text: "Our experience at Chaubandi was phenomenal. Setting up a fitting appointment was easy, the owner answered the phone right away. We needed outfits for a traditional Indian wedding and she delivered perfectly." },
+    { name: "Amelia Barnett", location: "Google Review ★★★★★", text: "Sushma created the most beautiful dress for me! I came in with a few reference photos and told her what I wanted. She brought my exact vision to life. Absolutely incredible work." },
+    { name: "Kat Wray", location: "Google Review ★★★★★", text: "Very reasonably priced compared to other options and I received so many compliments while in India. A wonderful experience from start to finish — I'll definitely be back." },
   ];
 
   const FAQS = [
