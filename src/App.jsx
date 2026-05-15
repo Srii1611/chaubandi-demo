@@ -104,7 +104,6 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'Outfit',sans-serif", background: "#faf8f5", color: "#1a1412", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Outfit:wght@200;300;400;500;600&display=swap');
         *{margin:0;padding:0;box-sizing:border-box}
         body{overflow-x:hidden}
         ::-webkit-scrollbar{width:6px}
@@ -171,9 +170,8 @@ export default function App() {
             </span>
           </nav>
           
-          <div style={{ cursor: "pointer", textAlign: "left", flexShrink: 0 }} onClick={() => navigate("home")}>
-            <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 600, letterSpacing: 3, lineHeight: 1 }}>CHAUBANDI</div>
-            <div style={{ fontSize: 9, letterSpacing: 4, color: "#8b2c3a", fontWeight: 500 }}>BOSTON · ARLINGTON, MA</div>
+          <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => navigate("home")}>
+            <img src="/logo.png" alt="Chaubandi · Knots of Tradition" style={{ height: 64, width: "auto", display: "block" }} />
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: 18, flex: 1, justifyContent: "flex-end" }}>
@@ -211,7 +209,7 @@ export default function App() {
                 <div style={{ width: 80, height: 100, borderRadius: 4, flexShrink: 0, overflow: "hidden" }}>
                   <div style={{ background: item.color, width: "100%", height: "100%" }}>
                     {item.images?.[0] && (
-                      <img src={item.images[0]} alt={item.name}
+                      <img src={item.images[0]} alt={item.name} loading="lazy"
                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     )}
                   </div>
@@ -328,7 +326,8 @@ function CategoryStrip({ navigate, setShopFilter, activeFilter }) {
                 {image && (
                   <img 
                     src={image} 
-                    alt={label} 
+                    alt={label}
+                    loading="lazy"
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
                   />
                 )}
@@ -372,8 +371,8 @@ function HeroCarousel({ navigate, setShopFilter }) {
         <div key={slide.id} style={{ position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity .9s ease-in-out", zIndex: i === current ? 1 : 0, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
           
           {/* 1. Render the Background Image */}
-          {slide.image ? (
-            <img src={slide.image} alt={slide.headline} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
+          {slide.image && i === current ? (
+            <img src={slide.image} alt={slide.headline} loading="eager" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
           ) : (
             <div style={{ position: "absolute", inset: 0, background: slide.bg }} />
           )}
@@ -407,45 +406,40 @@ function CouplesShowcase({ navigate }) {
   
   // Updated with your new Kling AI images and matching outfit descriptions
   const PAIRINGS = [
-    {
-      id: 1,
-      theme: "Crimson Vows",
-      image: "/Products/Couple/img1.png",
-      objectPosition: "center center",
-      hers: { name: "Maroon Velvet Bridal Lehenga", price: 599 },
-      his: { name: "Maroon Embroidered Sherwani", price: 399 }
+    { 
+      id: 1, 
+      theme: "Crimson Vows", 
+      image: "/Products/Couple/img1.png", 
+      hers: { name: "Maroon Velvet Bridal Lehenga", price: 599 }, 
+      his: { name: "Maroon Embroidered Sherwani", price: 399 } 
     },
-    {
-      id: 2,
-      theme: "Sangeet Spectacular",
-      image: "/Products/Couple/img2.png",
-      objectPosition: "center 20%",
-      hers: { name: "Mustard Mirror-Work Lehenga", price: 429 },
-      his: { name: "Navy Blue Bandhgala Suit", price: 249 }
+    { 
+      id: 2, 
+      theme: "Sangeet Spectacular", 
+      image: "/Products/Couple/img2.png", 
+      hers: { name: "Mustard Mirror-Work Lehenga", price: 429 }, 
+      his: { name: "Navy Blue Bandhgala Suit", price: 249 } 
     },
-    {
-      id: 3,
-      theme: "The Royal Reception",
-      image: "/Products/Couple/img3.png",
-      objectPosition: "center 15%",
-      hers: { name: "Navy Blue Silk Saree", price: 349 },
-      his: { name: "Black Velvet Jodhpuri Suit", price: 299 }
+    { 
+      id: 3, 
+      theme: "The Royal Reception", 
+      image: "/Products/Couple/img3.png", 
+      hers: { name: "Navy Blue Silk Saree", price: 349 }, 
+      his: { name: "Black Velvet Jodhpuri Suit", price: 299 } 
     },
-    {
-      id: 4,
-      theme: "Emerald Mehandi",
-      image: "/Products/Couple/img4.png",
-      objectPosition: "center center",
-      hers: { name: "Emerald Green Silk Lehenga", price: 459 },
-      his: { name: "Cream Kurta & Green Jacket", price: 189 }
+    { 
+      id: 4, 
+      theme: "Emerald Mehandi", 
+      image: "/Products/Couple/img4.png", 
+      hers: { name: "Emerald Green Silk Lehenga", price: 459 }, 
+      his: { name: "Cream Kurta & Green Jacket", price: 189 } 
     },
-    {
-      id: 5,
-      theme: "Nepali Heritage",
-      image: "/Products/Couple/img5.png",
-      objectPosition: "center 40%",
-      hers: { name: "Red Chaubandi Cholo & Saree", price: 319 },
-      his: { name: "Traditional Daura Suruwal", price: 159 }
+    { 
+      id: 5, 
+      theme: "Nepali Heritage", 
+      image: "/Products/Couple/img5.png", 
+      hers: { name: "Red Chaubandi Cholo & Saree", price: 319 }, 
+      his: { name: "Traditional Daura Suruwal", price: 159 } 
     },
   ];
 
@@ -460,13 +454,13 @@ function CouplesShowcase({ navigate }) {
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, marginBottom: 6 }}>Perfect Pairings</h2>
         <p style={{ fontSize: 13, color: "#7a6e64" }}>Curated matching sets for the bride and groom</p>
       </div>
-      <div style={{ position: "relative", height: "clamp(520px, 65vw, 820px)", borderRadius: 12, overflow: "hidden", background: "#1a1412" }}>
+      <div style={{ position: "relative", height: 700, borderRadius: 12, overflow: "hidden", background: "#1a1412" }}>
         {PAIRINGS.map((pair, idx) => (
           <div key={pair.id} style={{ position: "absolute", inset: 0, opacity: activeIdx === idx ? 1 : 0, transition: "opacity 1.2s ease-in-out", zIndex: activeIdx === idx ? 1 : 0 }}>
             
             {/* Added a fallback background color just in case img5 isn't ready yet */}
             <div style={{ width: "100%", height: "100%", background: "#2a2420" }}>
-              <img src={pair.image} alt={pair.theme} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: pair.objectPosition || "center center", display: "block" }} />
+              <img src={pair.image} alt={pair.theme} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
             </div>
             
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.88) 100%)" }} />
@@ -687,6 +681,7 @@ function HomePage({ navigate, products, setShopFilter }) {
               <img 
                 src={imgSrc} 
                 alt={occ} 
+                loading="lazy"
                 style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} 
               />
               
@@ -718,7 +713,7 @@ function ProductCard({ product, navigate }) {
       <div className="img-zoom" style={{ aspectRatio: "3/4", borderRadius: 6, marginBottom: 12, position: "relative", overflow: "hidden" }}>
         <div style={{ background: product.color, width: "100%", height: "100%" }}>
           {product.images?.[0] && (
-            <img src={product.images[0]} alt={product.name}
+            <img src={product.images[0]} alt={product.name} loading="lazy"
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           )}
         </div>
