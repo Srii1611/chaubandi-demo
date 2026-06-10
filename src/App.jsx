@@ -165,13 +165,18 @@ export default function App() {
 
           {/* Nav — beside logo */}
           <nav className="mobile-hide" style={{ display: "flex", alignItems: "center", gap: 26, flexShrink: 0 }}>
-            {["WOMEN", "MEN", "KIDS", "ACCESSORIES", "ABOUT US"].map(item => (
+            {["WOMEN", "MEN", "KIDS", "ACCESSORIES"].map(item => (
               <span key={item} onClick={() => navigate("shop")}
                 style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a6e64", cursor: "pointer", fontWeight: 400, transition: "color .3s", whiteSpace: "nowrap" }}
                 onMouseEnter={e => e.target.style.color = "#1a1412"} onMouseLeave={e => e.target.style.color = "#7a6e64"}>
                 {item}
               </span>
             ))}
+            <span onClick={() => navigate("story")}
+              style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a6e64", cursor: "pointer", fontWeight: 400, transition: "color .3s", whiteSpace: "nowrap" }}
+              onMouseEnter={e => e.target.style.color = "#1a1412"} onMouseLeave={e => e.target.style.color = "#7a6e64"}>
+              ABOUT US
+            </span>
             <span onClick={() => navigate("live")} style={{ fontSize: 13, letterSpacing: 1.5, textTransform: "uppercase", color: "#2a6a3a", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#2a6a3a", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
               LIVE VIDEO SHOPPING
@@ -271,6 +276,8 @@ export default function App() {
         {page === "product" && selectedProduct && <ProductPage product={selectedProduct} navigate={navigate} addToCart={addToCart} products={PRODUCTS} />}
         {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} />}
         {page === "live" && <LiveVideoPage navigate={navigate} />}
+        {page === "story" && <StoryPage navigate={navigate} />}
+        {page === "contact" && <ContactPage navigate={navigate} />}
       </main>
 
       {/* Global Footer */}
@@ -279,13 +286,13 @@ export default function App() {
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>Help</h4>
             {["Contact Us", "Shipping Info", "Returns & Exchanges", "FAQ", "Sizing Info"].map(l => (
-              <div key={l} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
+              <div key={l} onClick={() => { if (l === "Contact Us") navigate("contact"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
             ))}
           </div>
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>About</h4>
             {["Our Story", "Boutique Location", "Book Appointment", "Reviews"].map(l => (
-              <div key={l} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
+              <div key={l} onClick={() => { if (l === "Our Story") navigate("story"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
             ))}
           </div>
           <div>
@@ -315,6 +322,297 @@ export default function App() {
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/* ─── STORY PAGE ─── */
+function StoryPage({ navigate }) {
+  return (
+    <div>
+      <div style={{ background: "#1a1412", padding: "100px 32px 80px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 60%, rgba(197,162,85,0.10) 0%, transparent 68%)" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 18 }}>Our Story</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(40px,5vw,68px)", fontWeight: 300, color: "#f0ebe4", lineHeight: 1.1, marginBottom: 22 }}>
+            Knots of Tradition,<br /><em style={{ color: "#c5a255" }}>Woven with Love</em>
+          </h1>
+          <p style={{ fontSize: 14, color: "rgba(240,235,228,0.55)", maxWidth: 520, margin: "0 auto", lineHeight: 1.8 }}>
+            From a dream born with zero training to a boutique beloved across five US states — this is Sushma's story.
+          </p>
+        </div>
+      </div>
+
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 32px" }}>
+        <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 72, alignItems: "center" }}>
+          <div style={{ position: "relative" }}>
+            <div style={{ aspectRatio: "3/4", borderRadius: 4, overflow: "hidden", background: "linear-gradient(140deg, #3a0818, #6a1830 50%, #3a0818)", position: "relative" }}>
+              <img src="/images/sushma.jpg" alt="Sushma — Founder of Chaubandi Boston"
+                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }}
+                onError={(e) => { e.target.style.display = "none"; }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(26,20,18,0.55) 0%, transparent 45%)" }} />
+              <div style={{ position: "absolute", bottom: 28, left: 28 }}>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, color: "#f0ebe4", marginBottom: 4, fontWeight: 400 }}>Sushma</div>
+                <div style={{ fontSize: 10, letterSpacing: 3, color: "rgba(240,235,228,0.6)", textTransform: "uppercase" }}>Founder & Stylist · Chaubandi Boston</div>
+              </div>
+            </div>
+            <div style={{ position: "absolute", top: 20, left: -10, width: 3, height: "55%", background: "linear-gradient(to bottom, #c5a255, transparent)" }} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 18 }}>The Founder</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 48, fontWeight: 400, lineHeight: 1.05, marginBottom: 28, color: "#1a1412" }}>Meet Sushma</h2>
+            <p style={{ fontSize: 14, color: "#7a6e64", lineHeight: 1.9, marginBottom: 18 }}>
+              My journey with fashion didn't begin in a design school. I had zero formal sewing training when I first fell in love with the art of Indian and Nepali ethnic wear. I taught myself — stitch by stitch, fabric by fabric — until I truly understood every seam, every embroidery technique, every thread that makes a garment come alive.
+            </p>
+            <p style={{ fontSize: 14, color: "#7a6e64", lineHeight: 1.9, marginBottom: 18 }}>
+              That determination led me to set up my own manufacturing and alterations process, and eventually to open Chaubandi right here in Arlington, Massachusetts. Today, I can look at a customer and know their perfect fit in ten minutes. That intuition — that personal touch — is something no algorithm can replace.
+            </p>
+            <p style={{ fontSize: 14, color: "#7a6e64", lineHeight: 1.9, marginBottom: 36 }}>
+              Customers were driving hours from Vermont, New York, New Jersey — just to come to me. I built this website to bring that same experience to every single one of them, no matter where they are. You shouldn't have to wait weeks for a package from India when I'm right here.
+            </p>
+            <blockquote style={{ borderLeft: "3px solid #c5a255", paddingLeft: 24, marginBottom: 40 }}>
+              <p style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontStyle: "italic", color: "#1a1412", lineHeight: 1.6, marginBottom: 12 }}>
+                "No shipping uncertainty. No returns from India. Just you, me, and the perfect dress."
+              </p>
+              <cite style={{ fontSize: 11, letterSpacing: 2.5, color: "#7a6e64", textTransform: "uppercase", fontStyle: "normal" }}>— Sushma, Founder · Chaubandi Boston</cite>
+            </blockquote>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <button onClick={() => window.open("https://wa.me/18578001282", "_blank")} className="btn-shine"
+                style={{ padding: "14px 36px", background: "#1a1412", color: "#f0ebe4", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>
+                Talk to Sushma
+              </button>
+              <button onClick={() => navigate("shop")}
+                style={{ padding: "14px 36px", background: "transparent", color: "#1a1412", border: "1px solid #1a1412", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+                Shop the Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style={{ background: "#faf8f5", borderTop: "1px solid #e2ddd6", borderBottom: "1px solid #e2ddd6", padding: "80px 32px" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>The Journey</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, color: "#1a1412" }}>How It All Began</h2>
+          </div>
+          <div>
+            {[
+              { icon: "🪡", label: "The Beginning", title: "Zero Training. Pure Passion.", desc: "Sushma had never taken a sewing class in her life. What she had was an eye for fit, a love for fabric, and the determination to figure it out — entirely on her own." },
+              { icon: "✂️", label: "The Craft", title: "Self-Taught, Then Mastered", desc: "Years of relentless practice turned into mastery. She learned every technique — zardozi embroidery, blouse cutting, dupatta draping — until she could teach others how to do it." },
+              { icon: "🏪", label: "The Boutique", title: "Chaubandi Boston Opens", desc: "She set up her own manufacturing and alteration process, then opened the boutique in Arlington, MA. Word spread fast — customers started driving 3–4 hours just to visit." },
+              { icon: "🌎", label: "Today", title: "Five States. One Vision.", desc: "With 200K+ Instagram followers and customers across five states, this website is Sushma's way of saying: you don't need to drive to Arlington. She'll bring the boutique to you." },
+            ].map((step, i, arr) => (
+              <div key={i} style={{ display: "flex", gap: 28, paddingBottom: i < arr.length - 1 ? 44 : 0, position: "relative" }}>
+                {i < arr.length - 1 && <div style={{ position: "absolute", left: 21, top: 50, bottom: 0, width: 1, background: "linear-gradient(to bottom, #c5a255, #e2ddd6)" }} />}
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#fff", border: "1.5px solid #c5a255", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18, zIndex: 1, boxShadow: "0 2px 12px rgba(197,162,85,0.15)" }}>{step.icon}</div>
+                <div style={{ paddingTop: 8 }}>
+                  <div style={{ fontSize: 10, letterSpacing: 2, color: "#c5a255", textTransform: "uppercase", marginBottom: 6 }}>{step.label}</div>
+                  <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, color: "#1a1412", fontWeight: 400, marginBottom: 8 }}>{step.title}</h3>
+                  <p style={{ fontSize: 13, color: "#7a6e64", lineHeight: 1.8, maxWidth: 560 }}>{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ background: "#1a1412", padding: "80px 32px" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 18 }}>Why Chaubandi</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(28px,4vw,50px)", fontWeight: 300, color: "#f0ebe4", marginBottom: 18, lineHeight: 1.2 }}>
+            You Don't Need to Order From India.<br /><em style={{ color: "#c5a255" }}>We're Right Here in the US.</em>
+          </h2>
+          <p style={{ fontSize: 14, color: "rgba(240,235,228,0.55)", maxWidth: 580, margin: "0 auto 56px", lineHeight: 1.8 }}>
+            Forget the weeks of waiting, the sizing guesswork, and the customs fees. Chaubandi is based in Arlington, MA — and Sushma personally handles every order.
+          </p>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
+            {[
+              { icon: "✂️", title: "Free Alterations", desc: "Every piece altered to fit you perfectly — at no extra cost. For in-store and online orders both." },
+              { icon: "📦", title: "Free USA Shipping", desc: "Fast, tracked shipping to all 50 states. No customs fees, no delays, no international surprises." },
+              { icon: "📞", title: "Owner Picks Up the Phone", desc: "When you call, Sushma answers. No bots, no wait queues — just real, personal service from the founder." },
+            ].map(item => (
+              <div key={item.title} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(197,162,85,0.18)", borderRadius: 8, padding: "36px 24px" }}>
+                <div style={{ fontSize: 30, marginBottom: 18 }}>{item.icon}</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, color: "#f0ebe4", fontWeight: 400, marginBottom: 10 }}>{item.title}</h3>
+                <p style={{ fontSize: 13, color: "rgba(240,235,228,0.5)", lineHeight: 1.8 }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ maxWidth: 700, margin: "0 auto", padding: "80px 32px", textAlign: "center" }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 16 }}>Ready to Find Your Look?</div>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(32px,3.5vw,44px)", fontWeight: 300, color: "#1a1412", marginBottom: 14, lineHeight: 1.2 }}>
+          Your Perfect Outfit<br /><em>Is One Call Away</em>
+        </h2>
+        <p style={{ fontSize: 14, color: "#7a6e64", marginBottom: 36, lineHeight: 1.8, maxWidth: 480, margin: "0 auto 36px" }}>
+          Book a free virtual styling session with Sushma, or browse the collection and let us bring the boutique right to your door.
+        </p>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+          <button onClick={() => navigate("contact")} className="btn-shine"
+            style={{ padding: "15px 40px", background: "#c5a255", color: "#1a1412", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
+            Get in Touch
+          </button>
+          <button onClick={() => navigate("shop")}
+            style={{ padding: "15px 40px", background: "transparent", color: "#1a1412", border: "1px solid #1a1412", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+            Shop Collection
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ─── CONTACT PAGE ─── */
+function ContactPage({ navigate }) {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = "Name is required";
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.message.trim()) e.message = "Message is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validate()) return;
+    setSending(true);
+    setTimeout(() => { setSending(false); setSent(true); }, 1400);
+  };
+
+  const field = (hasError) => ({
+    width: "100%", height: 48, border: `1px solid ${hasError ? "#8b2c3a" : "#e2ddd6"}`,
+    borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14,
+    outline: "none", background: "#fff", color: "#1a1412", transition: "border-color .2s"
+  });
+
+  if (sent) {
+    return (
+      <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center" }}>
+        <div className="fade-in">
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #c5a255, #a08030)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <Check size={32} color="#fff" strokeWidth={2.5} />
+          </div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 40, fontWeight: 400, marginBottom: 14 }}>Message Sent!</h2>
+          <p style={{ fontSize: 14, color: "#7a6e64", maxWidth: 380, margin: "0 auto 36px", lineHeight: 1.8 }}>
+            Thank you, {form.name.split(" ")[0]}! Sushma reads every message personally and will be in touch shortly.
+          </p>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={() => navigate("home")} className="btn-shine"
+              style={{ padding: "14px 36px", background: "#1a1412", color: "#fff", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+              Back to Home
+            </button>
+            <button onClick={() => navigate("shop")}
+              style={{ padding: "14px 36px", background: "transparent", color: "#1a1412", border: "1px solid #1a1412", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+              Browse Collection
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ background: "#faf8f5", borderBottom: "1px solid #e2ddd6", padding: "64px 32px", textAlign: "center" }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>We'd Love to Hear From You</div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px,4.5vw,58px)", fontWeight: 300, color: "#1a1412", marginBottom: 14, lineHeight: 1.1 }}>Get In Touch</h1>
+        <p style={{ fontSize: 14, color: "#7a6e64", maxWidth: 460, margin: "0 auto", lineHeight: 1.8 }}>
+          Whether you have a question, need styling advice, or want to book an appointment — Sushma reads every message personally.
+        </p>
+      </div>
+
+      <div className="mobile-stack" style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 32px 80px", display: "grid", gridTemplateColumns: "320px 1fr", gap: 64, alignItems: "start" }}>
+        <div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 400, marginBottom: 32, color: "#1a1412" }}>Boutique Details</h2>
+          {[
+            { icon: "📍", title: "Address", lines: ["177 Massachusetts Avenue", "Arlington, MA 02474"] },
+            { icon: "🕐", title: "Store Hours", lines: ["Tuesday – Sunday", "10:00 AM – 7:00 PM ET"] },
+            { icon: "📞", title: "Phone & WhatsApp", lines: ["+1 (857) 800-1282"] },
+            { icon: "📸", title: "Instagram", lines: ["@ChaubandiBoston"] },
+          ].map(item => (
+            <div key={item.title} style={{ marginBottom: 24, paddingBottom: 24, borderBottom: "1px solid #e2ddd6" }}>
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 18, marginTop: 2, flexShrink: 0 }}>{item.icon}</span>
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: 2.5, textTransform: "uppercase", color: "#7a6e64", marginBottom: 5 }}>{item.title}</div>
+                  {item.lines.map(l => <div key={l} style={{ fontSize: 14, color: "#1a1412", lineHeight: 1.7 }}>{l}</div>)}
+                </div>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => window.open("https://wa.me/18578001282", "_blank")} className="btn-shine"
+            style={{ width: "100%", padding: "14px 0", background: "#25D366", color: "#fff", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif", borderRadius: 4, marginBottom: 12 }}>
+            Chat on WhatsApp
+          </button>
+          <button onClick={() => window.open("https://instagram.com/chaubandiboston", "_blank")}
+            style={{ width: "100%", padding: "14px 0", background: "transparent", color: "#1a1412", border: "1px solid #e2ddd6", cursor: "pointer", fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>
+            Follow on Instagram
+          </button>
+        </div>
+
+        <div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 400, marginBottom: 32, color: "#1a1412" }}>Send a Message</h2>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#7a6e64", display: "block", marginBottom: 8 }}>Your Name *</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" style={field(errors.name)}
+                onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = errors.name ? "#8b2c3a" : "#e2ddd6"} />
+              {errors.name && <div style={{ fontSize: 11, color: "#8b2c3a", marginTop: 5 }}>{errors.name}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#7a6e64", display: "block", marginBottom: 8 }}>Email Address *</label>
+              <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" type="email" style={field(errors.email)}
+                onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = errors.email ? "#8b2c3a" : "#e2ddd6"} />
+              {errors.email && <div style={{ fontSize: 11, color: "#8b2c3a", marginTop: 5 }}>{errors.email}</div>}
+            </div>
+          </div>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#7a6e64", display: "block", marginBottom: 8 }}>Phone (Optional)</label>
+              <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+1 (000) 000-0000" style={field(false)}
+                onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = "#e2ddd6"} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#7a6e64", display: "block", marginBottom: 8 }}>Topic</label>
+              <select value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
+                style={{ width: "100%", height: 48, border: "1px solid #e2ddd6", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#fff", color: form.subject ? "#1a1412" : "#b0a89e", cursor: "pointer" }}>
+                <option value="" disabled>Select a topic</option>
+                <option value="bridal">Bridal Consultation</option>
+                <option value="order">Order Inquiry</option>
+                <option value="alteration">Alterations</option>
+                <option value="appointment">Book Appointment</option>
+                <option value="virtual">Virtual Styling Session</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#7a6e64", display: "block", marginBottom: 8 }}>Message *</label>
+            <textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })}
+              placeholder="Tell us about your occasion, what you're looking for, your budget, or any questions..."
+              rows={6}
+              style={{ width: "100%", border: `1px solid ${errors.message ? "#8b2c3a" : "#e2ddd6"}`, borderRadius: 4, padding: "14px 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#fff", color: "#1a1412", resize: "vertical", lineHeight: 1.65 }}
+              onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = errors.message ? "#8b2c3a" : "#e2ddd6"} />
+            {errors.message && <div style={{ fontSize: 11, color: "#8b2c3a", marginTop: 5 }}>{errors.message}</div>}
+          </div>
+          <button onClick={handleSubmit} disabled={sending} className="btn-shine"
+            style={{ width: "100%", height: 52, background: "#1a1412", color: "#f0ebe4", border: "none", cursor: sending ? "default" : "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: sending ? 0.65 : 1 }}>
+            {sending ? "Sending…" : "Send Message"}
+          </button>
+          <p style={{ fontSize: 12, color: "#b0a89e", textAlign: "center", marginTop: 16, lineHeight: 1.65 }}>
+            Sushma personally reads every message. Expect a reply within a few hours.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -780,17 +1078,33 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart }) {
   );
 }
 
-/* ─── PRODUCT PAGE ─── */
+/* ─── PRODUCT PAGE (FULL REBUILD) ───
+   Replaces the existing ProductPage function in App.jsx
+   Matches AZA layout: vertical thumbnail strip, wishlist, shop-with-confidence,
+   offers, tab underline style, shipping accordion, complete-the-look section
+*/
+
 function ProductPage({ product, navigate, addToCart, products }) {
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[2] || product.sizes?.[0]);
-  const [added, setAdded] = useState(false);
-  const [tab, setTab] = useState("details");
-  const [activeImg, setActiveImg] = useState(0);
+  const [added, setAdded]               = useState(false);
+  const [tab, setTab]                   = useState("details");
+  const [activeImg, setActiveImg]       = useState(0);
+  const [wishlist, setWishlist]         = useState(false);
+  const [openAcc, setOpenAcc]           = useState(null);
+
+  /* related products */
   const related = products.filter(p => p.id !== product.id && p.cat === product.cat).slice(0, 4);
   if (related.length < 4) {
-    const more = products.filter(p => p.id !== product.id && !related.find(r => r.id === p.id)).slice(0, 4 - related.length);
+    const more = products
+      .filter(p => p.id !== product.id && !related.find(r => r.id === p.id))
+      .slice(0, 4 - related.length);
     related.push(...more);
   }
+
+  /* accessories for "Complete the Look" */
+  const accessories = products
+    .filter(p => ["Jewellery","Accessories","Shoes","Shoes/Boots"].includes(p.cat))
+    .slice(0, 4);
 
   const handleAdd = () => {
     addToCart(product, selectedSize);
@@ -798,100 +1112,373 @@ function ProductPage({ product, navigate, addToCart, products }) {
     setTimeout(() => setAdded(false), 2000);
   };
 
+  const accordions = [
+    {
+      id: "shipping",
+      title: "Shipping & Returns",
+      body: "Free shipping on all US orders. Ships within 24–48 hours via tracked courier. Free alterations included — we'll reach out for your measurements after purchase. Returns accepted within 14 days for store credit on unworn, unaltered items."
+    },
+    {
+      id: "sizing",
+      title: "Sizing & Custom Fit",
+      body: "This piece is semi-stitched for a custom fit. Select your standard size and our team will tailor it to your exact measurements at no extra charge. Need a custom size? WhatsApp us for a free virtual fitting session with Sushma."
+    },
+  ];
+
+  /* ── shared input style for tabs ── */
+  const tabBtn = (t) => ({
+    padding: "13px 22px", border: "none", background: "transparent",
+    color: t === tab ? "#1a1412" : "#7a6e64",
+    fontSize: 11, cursor: "pointer",
+    textTransform: "uppercase", letterSpacing: 1.5,
+    fontFamily: "'Outfit',sans-serif",
+    fontWeight: t === tab ? 600 : 400,
+    borderBottom: `2px solid ${t === tab ? "#8b2c3a" : "transparent"}`,
+    transition: "all .2s", marginBottom: -1
+  });
+
   return (
-    <div>
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 32px 80px" }}>
-        <div className="fade-in" style={{ fontSize: 12, color: "#7a6e64", marginBottom: 24 }}>
-          <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>Shop</span> / <span style={{ cursor: "pointer" }} onClick={() => { navigate("shop"); }}>{product.cat}</span> / <span style={{ color: "#1a1412" }}>{product.name}</span>
+    <div style={{ background: "#faf8f5" }}>
+
+      {/* ── BREADCRUMB ── */}
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 32px 0" }}>
+        <div style={{ fontSize: 12, color: "#7a6e64" }}>
+          <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span>
+          <span style={{ margin: "0 8px", color: "#ddd" }}>/</span>
+          <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>Shop</span>
+          <span style={{ margin: "0 8px", color: "#ddd" }}>/</span>
+          <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>{product.cat}</span>
+          <span style={{ margin: "0 8px", color: "#ddd" }}>/</span>
+          <span style={{ color: "#1a1412" }}>{product.name}</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48 }} className="mobile-stack">
-          <div className="fade-in d1">
-            <div style={{ aspectRatio: "3/4", borderRadius: 8, overflow: "hidden", marginBottom: 12, position: "relative", cursor: "zoom-in" }}>
-              <div style={{ background: product.color, width: "100%", height: "100%" }}>
+      </div>
+
+      {/* ── MAIN PRODUCT GRID ── */}
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 32px 80px" }}>
+        <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56 }}>
+
+          {/* ══ LEFT: Image Gallery ══ */}
+          <div className="fade-in d1" style={{ display: "flex", gap: 12 }}>
+
+            {/* Vertical thumbnail strip */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 76, flexShrink: 0 }}>
+              {product.images.map((src, i) => (
+                <div key={i} onClick={() => setActiveImg(i)} style={{
+                  width: 76, height: 94, borderRadius: 4, overflow: "hidden",
+                  border: `2px solid ${i === activeImg ? "#8b2c3a" : "transparent"}`,
+                  opacity: i === activeImg ? 1 : 0.6,
+                  cursor: "pointer", background: product.color,
+                  transition: "all .2s", flexShrink: 0
+                }}>
+                  <img src={src} alt={`View ${i + 1}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Main image */}
+            <div style={{ flex: 1, position: "relative" }}>
+              <div style={{
+                aspectRatio: "3/4", borderRadius: 6, overflow: "hidden",
+                background: product.color, cursor: "zoom-in", position: "relative"
+              }}>
                 {product.images?.[activeImg] && (
                   <img src={product.images[activeImg]} alt={product.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 )}
+
+                {/* Badges top-left */}
+                <div style={{ position: "absolute", top: 16, left: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {product.badge && (
+                    <span style={{ padding: "6px 14px", background: "#8b2c3a", color: "#fff", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", borderRadius: 2 }}>
+                      {product.badge}
+                    </span>
+                  )}
+                  <span style={{ padding: "6px 14px", background: "#c5a255", color: "#1a1412", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", borderRadius: 2 }}>
+                    Handmade
+                  </span>
+                </div>
+
+                {/* Wishlist button top-right */}
+                <button onClick={() => setWishlist(!wishlist)} style={{
+                  position: "absolute", top: 16, right: 16,
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: "#fff", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.12)", transition: "transform .2s"
+                }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                  <Heart size={17} fill={wishlist ? "#8b2c3a" : "none"} color={wishlist ? "#8b2c3a" : "#7a6e64"} />
+                </button>
               </div>
-              {product.badge && <div style={{ position: "absolute", top: 16, left: 16, display: "flex", gap: 8 }}>
-                <span style={{ padding: "7px 16px", background: "#8b2c3a", color: "#fff", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>{product.badge}</span>
-                <span style={{ padding: "7px 16px", background: "#c5a255", color: "#1a1412", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>Handmade</span>
-              </div>}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-              {product.images.map((src, i) => (
-                <div key={i} onClick={() => setActiveImg(i)} style={{ aspectRatio: 1, borderRadius: 6, background: product.color, opacity: i === activeImg ? 1 : .7, border: i === activeImg ? "2px solid #8b2c3a" : "2px solid transparent", cursor: "pointer", overflow: "hidden" }}>
-                  <img src={src} alt={`${product.name} view ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
+
+          {/* ══ RIGHT: Product Info ══ */}
+          <div className="fade-in d2">
+
+            {/* Style code */}
+            <div style={{ fontSize: 11, color: "#7a6e64", letterSpacing: 2.5, marginBottom: 10, textTransform: "uppercase" }}>
+              Style: CB-{product.cat.toUpperCase().slice(0, 3)}-{product.id.toString().padStart(4, "0")}
+            </div>
+
+            {/* Name */}
+            <h1 style={{
+              fontFamily: "'Cormorant Garamond',serif", fontSize: 34,
+              fontWeight: 400, lineHeight: 1.15, marginBottom: 14, color: "#1a1412"
+            }}>
+              {product.name}
+            </h1>
+
+            {/* Rating */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 1 }}>
+                {[1, 2, 3, 4, 5].map(s => (
+                  <span key={s} style={{ color: s <= Math.floor(product.rating) ? "#c5a255" : "#ddd", fontSize: 15 }}>★</span>
+                ))}
+              </div>
+              <span style={{ fontSize: 13, color: "#7a6e64" }}>{product.rating} · {product.reviews} Reviews</span>
+            </div>
+
+            {/* Price */}
+            <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, color: "#1a1412", marginBottom: 6 }}>
+              ${product.price}
+            </div>
+            <div style={{ fontSize: 13, color: "#7a6e64", marginBottom: 24, paddingBottom: 24, borderBottom: "1px solid #e2ddd6" }}>
+              Free alterations · Free shipping · Ships 24–48hrs
+            </div>
+
+            {/* Size selector */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, color: "#1a1412" }}>Size</span>
+                <span style={{ fontSize: 12, color: "#8b2c3a", cursor: "pointer", textDecoration: "underline" }}>Size Guide →</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {product.sizes.map(s => (
+                  <button key={s} onClick={() => setSelectedSize(s)} style={{
+                    minWidth: 52, height: 44, padding: "0 16px",
+                    border: `1.5px solid ${s === selectedSize ? "#1a1412" : "#e2ddd6"}`,
+                    background: s === selectedSize ? "#1a1412" : "#fff",
+                    color: s === selectedSize ? "#fff" : "#7a6e64",
+                    cursor: "pointer", fontSize: 12, borderRadius: 4,
+                    fontFamily: "'Outfit',sans-serif", transition: "all .2s"
+                  }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Blouse info bar */}
+            <div style={{
+              background: "#f3efe9", borderRadius: 6, padding: "13px 18px",
+              fontSize: 13, color: "#7a6e64", marginBottom: 20,
+              borderLeft: "3px solid #8b2c3a"
+            }}>
+              <strong style={{ color: "#1a1412" }}>Blouse Padding:</strong> Included. Custom stitching with every purchase.
+            </div>
+
+            {/* CTA Buttons */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <button className="btn-shine" onClick={handleAdd} style={{
+                width: "100%", height: 54, border: "none", cursor: "pointer",
+                fontSize: 12, letterSpacing: 3, textTransform: "uppercase",
+                fontFamily: "'Outfit',sans-serif",
+                background: added ? "#2a6a3a" : "#1a1412",
+                color: "#fff", transition: "background .3s", borderRadius: 4
+              }}>
+                {added ? "✓ Added to Cart" : "Add to Cart"}
+              </button>
+
+              <button onClick={() => setWishlist(!wishlist)} style={{
+                width: "100%", height: 48,
+                border: `1.5px solid ${wishlist ? "#8b2c3a" : "#e2ddd6"}`,
+                background: wishlist ? "#fff5f5" : "#fff",
+                cursor: "pointer", fontSize: 12, letterSpacing: 2.5,
+                textTransform: "uppercase", fontFamily: "'Outfit',sans-serif",
+                color: wishlist ? "#8b2c3a" : "#7a6e64", borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                gap: 8, transition: "all .2s"
+              }}>
+                <Heart size={15} fill={wishlist ? "#8b2c3a" : "none"} color={wishlist ? "#8b2c3a" : "#7a6e64"} />
+                {wishlist ? "Saved to Wishlist" : "Save to Wishlist"}
+              </button>
+
+              <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20am%20interested%20in%20" + encodeURIComponent(product.name), "_blank")} style={{
+                width: "100%", height: 48, border: "1px solid #e2ddd6",
+                background: "#fff", cursor: "pointer", fontSize: 12,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                gap: 8, color: "#1a1412", borderRadius: 4,
+                fontFamily: "'Outfit',sans-serif"
+              }}>
+                💬 WhatsApp / Text — 857-800-1282
+              </button>
+            </div>
+
+            {/* Trust badges 2×2 */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
+              {[["⏱", "Ships 24–48h"], ["📦", "Free Shipping"], ["✂️", "Free Alterations"], ["📍", "Arlington, MA"]].map(([icon, text]) => (
+                <div key={text} style={{
+                  padding: "12px 14px", background: "#f3efe9", borderRadius: 6,
+                  fontSize: 12, color: "#7a6e64", display: "flex", alignItems: "center", gap: 8
+                }}>
+                  {icon} {text}
                 </div>
               ))}
             </div>
-          </div>
-          <div className="fade-in d2">
-            <div style={{ fontSize: 12, color: "#7a6e64", letterSpacing: 2, marginBottom: 8 }}>STYLE: CB-{product.cat.toUpperCase().slice(0,3)}-{product.id.toString().padStart(4,"0")}</div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 34, fontWeight: 400, lineHeight: 1.15, marginBottom: 16 }}>{product.name}</h1>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              <span style={{ color: "#c5a255", fontSize: 14, letterSpacing: 2 }}>{"★".repeat(Math.floor(product.rating))}</span>
-              <span style={{ fontSize: 13, color: "#7a6e64" }}>{product.rating} · {product.reviews} Reviews</span>
+
+            {/* Shop with Confidence */}
+            <div style={{ border: "1px solid #e2ddd6", borderRadius: 8, padding: "20px", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: "#1a1412", fontWeight: 600, marginBottom: 18 }}>
+                Shop with Confidence
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {[
+                  { icon: "🔒", title: "100% Authentic", desc: "Handcrafted or sourced directly from trusted artisans" },
+                  { icon: "✂️", title: "Free Alterations", desc: "Tailored to your exact measurements at no extra cost" },
+                  { icon: "🔄", title: "Easy Returns", desc: "14-day returns for store credit on unworn items" },
+                  { icon: "💳", title: "Secure Checkout", desc: "Your payment information is always encrypted" },
+                ].map(item => (
+                  <div key={item.title} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1412", marginBottom: 2 }}>{item.title}</div>
+                      <div style={{ fontSize: 11, color: "#7a6e64", lineHeight: 1.55 }}>{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, marginBottom: 6 }}>${product.price}</div>
-            <div style={{ fontSize: 13, color: "#7a6e64", marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid #e2ddd6" }}>Free alterations · Free shipping · Ships 24–48hrs</div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 500, color: "#7a6e64" }}>Size</span>
-              <span style={{ fontSize: 12, color: "#8b2c3a", cursor: "pointer" }}>Size Guide</span>
+
+            {/* Offers */}
+            <div style={{ border: "1px solid #e2ddd6", borderRadius: 8, padding: "16px 20px", marginBottom: 24 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: "#1a1412", fontWeight: 600, marginBottom: 14 }}>
+                Offers & Perks
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  { code: "WELCOME10", desc: "10% off your first order" },
+                  { code: "FREE FIT", desc: "Free virtual measurement session via WhatsApp" },
+                ].map(offer => (
+                  <div key={offer.code} style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <span style={{
+                      padding: "4px 10px", background: "#f3efe9",
+                      border: "1px dashed #c5a255", borderRadius: 4,
+                      fontSize: 10, color: "#8b2c3a", fontWeight: 700,
+                      letterSpacing: 1, flexShrink: 0
+                    }}>{offer.code}</span>
+                    <span style={{ fontSize: 12, color: "#7a6e64" }}>{offer.desc}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-              {product.sizes.map(s => (
-                <button key={s} onClick={() => setSelectedSize(s)}
-                  style={{ minWidth: 50, height: 44, padding: "0 16px", border: `1.5px solid ${s === selectedSize ? "#1a1412" : "#e2ddd6"}`, background: s === selectedSize ? "#1a1412" : "#fff", color: s === selectedSize ? "#fff" : "#7a6e64", cursor: "pointer", fontSize: 12, borderRadius: 4, fontFamily: "'Outfit',sans-serif", transition: "all .2s" }}>
-                  {s}
+
+            {/* Tabs: underline style */}
+            <div style={{ borderBottom: "1px solid #e2ddd6", marginBottom: 0 }}>
+              <div style={{ display: "flex" }}>
+                {["details", "fabric", "care"].map(t => (
+                  <button key={t} onClick={() => setTab(t)} style={tabBtn(t)}>
+                    {t === "details" ? "Details" : t === "fabric" ? "Fabric & Fit" : "Care"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.85, color: "#7a6e64", padding: "16px 0 24px" }}>
+              {tab === "details" && <p style={{ margin: 0 }}>{product.desc}</p>}
+              {tab === "fabric" && <p style={{ margin: 0 }}>Premium fabric with heavy embroidery, sequins, and zari work. Semi-stitched blouse for custom fitting. Cancan layering for volume. Approx 3.2kg total set weight.</p>}
+              {tab === "care" && <p style={{ margin: 0 }}>Dry clean only. Store in a breathable garment bag away from direct sunlight. Iron on low heat with a cloth barrier — never directly on embroidery or sequin work.</p>}
+            </div>
+
+            {/* Accordions */}
+            {accordions.map(acc => (
+              <div key={acc.id} style={{ borderTop: "1px solid #e2ddd6" }}>
+                <button onClick={() => setOpenAcc(openAcc === acc.id ? null : acc.id)} style={{
+                  width: "100%", padding: "18px 0",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  background: "none", border: "none", cursor: "pointer",
+                  fontFamily: "'Outfit',sans-serif"
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1412" }}>{acc.title}</span>
+                  <span style={{
+                    fontSize: 20, color: "#7a6e64", lineHeight: 1,
+                    transition: "transform .2s",
+                    transform: openAcc === acc.id ? "rotate(45deg)" : "none",
+                    display: "inline-block"
+                  }}>+</span>
                 </button>
-              ))}
-            </div>
-            <div style={{ background: "#f3efe9", borderRadius: 6, padding: "14px 18px", fontSize: 13, color: "#7a6e64", marginBottom: 24, borderLeft: "3px solid #8b2c3a" }}>
-              <strong style={{ color: "#1a1412" }}>Blouse Padding:</strong> Included. Custom stitching with every purchase.
-            </div>
-            <button className="btn-shine" onClick={handleAdd}
-              style={{ width: "100%", height: 54, border: "none", cursor: "pointer", fontSize: 13, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", background: added ? "#2a6a3a" : "#1a1412", color: "#fff", marginBottom: 10, transition: "background .3s", borderRadius: 4 }}>
-              {added ? "✓ Added to Cart" : "Add to Cart"}
-            </button>
-            <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20am%20interested%20in%20the%20" + encodeURIComponent(product.name), "_blank")}
-              style={{ width: "100%", height: 48, border: "1px solid #e2ddd6", background: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#1a1412", borderRadius: 4, fontFamily: "'Outfit',sans-serif", marginBottom: 24 }}>
-              💬 WhatsApp / Text — 857-800-1282
-            </button>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 28 }}>
-              {[["⏱","Ships 24–48h"],["📦","Free Shipping"],["✂️","Free Alterations"],["📍","Arlington, MA"]].map(([i,t]) => (
-                <div key={t} style={{ padding: "12px 14px", background: "#f3efe9", borderRadius: 6, fontSize: 12, color: "#7a6e64", display: "flex", alignItems: "center", gap: 8 }}>{i} {t}</div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-              {["details","fabric","care"].map(t => (
-                <button key={t} onClick={() => setTab(t)}
-                  style={{ padding: "10px 20px", borderRadius: 100, border: `1px solid ${t === tab ? "#1a1412" : "#e2ddd6"}`, background: t === tab ? "#1a1412" : "#fff", color: t === tab ? "#fff" : "#7a6e64", fontSize: 11, cursor: "pointer", textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Outfit',sans-serif" }}>
-                  {t === "details" ? "Details" : t === "fabric" ? "Fabric & Fit" : "Care"}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.8, color: "#7a6e64", marginBottom: 28 }}>
-              {tab === "details" && <p>{product.desc}</p>}
-              {tab === "fabric" && <p>Premium fabric with heavy embroidery, sequins, and zari work. Semi-stitched blouse for custom fitting. Cancan layering for volume. Approx 3.2kg total set weight.</p>}
-              {tab === "care" && <p>Dry clean only. Store in breathable garment bag. Avoid direct sunlight. Iron on low heat with cloth barrier — never directly on embroidery.</p>}
-            </div>
-            <div style={{ paddingTop: 20, borderTop: "1px solid #e2ddd6", display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {[["💬","WhatsApp"],["📞","Call"],["✉️","Email"],["📸","Instagram"]].map(([i,t]) => (
-                <span key={t} style={{ padding: "8px 16px", border: "1px solid #e2ddd6", borderRadius: 100, fontSize: 12, color: "#7a6e64", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>{i} {t}</span>
-              ))}
+                {openAcc === acc.id && (
+                  <div style={{ paddingBottom: 18, fontSize: 13, color: "#7a6e64", lineHeight: 1.8 }}>
+                    {acc.body}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ borderTop: "1px solid #e2ddd6" }} />
+
+            {/* Need Help chips */}
+            <div style={{ paddingTop: 20 }}>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, textTransform: "uppercase", color: "#7a6e64", marginBottom: 14 }}>Need Help?</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { icon: "💬", label: "WhatsApp", fn: () => window.open("https://wa.me/18578001282", "_blank") },
+                  { icon: "📞", label: "Call", fn: () => window.open("tel:+18578001282") },
+                  { icon: "✉️", label: "Email", fn: () => navigate("contact") },
+                  { icon: "📸", label: "Instagram", fn: () => window.open("https://instagram.com/chaubandiboston", "_blank") },
+                ].map(item => (
+                  <span key={item.label} onClick={item.fn}
+                    style={{
+                      padding: "9px 18px", border: "1px solid #e2ddd6", borderRadius: 100,
+                      fontSize: 12, color: "#7a6e64", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 6, transition: "all .2s"
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#1a1412"; e.currentTarget.style.color = "#1a1412"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#e2ddd6"; e.currentTarget.style.color = "#7a6e64"; }}
+                  >
+                    {item.icon} {item.label}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
+
         </div>
       </div>
+
+      {/* ── YOU MAY ALSO LIKE ── */}
       <section style={{ background: "#fff", padding: "64px 32px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, marginBottom: 32, textAlign: "center" }}>You May Also Like</h2>
+          <div style={{ textAlign: "center", marginBottom: 36 }}>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>More to Love</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, color: "#1a1412" }}>You May Also Like</h2>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 20 }}>
             {related.map(p => <ProductCard key={p.id} product={p} navigate={navigate} />)}
           </div>
         </div>
       </section>
+
+      {/* ── COMPLETE THE LOOK ── */}
+      <section style={{ background: "#faf8f5", padding: "64px 32px", borderTop: "1px solid #e2ddd6" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 36 }}>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Style It Right</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, color: "#1a1412" }}>Complete the Look</h2>
+          </div>
+          {accessories.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 16 }}>
+              {accessories.map(p => <ProductCard key={p.id} product={p} navigate={navigate} />)}
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "48px 0", color: "#7a6e64", fontSize: 14, fontFamily: "'Cormorant Garamond',serif", fontStyle: "italic", fontSize: 18 }}>
+              Jewellery & accessories coming soon.
+            </div>
+          )}
+        </div>
+      </section>
+
     </div>
   );
 }
