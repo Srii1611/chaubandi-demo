@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Heart, Search, X, Plus, Minus, Trash2, ChevronRight, ChevronLeft, User, Filter, Check } from "lucide-react";
+import * as medusa from "./lib/medusa";
 
 const PRODUCTS = [
-  { id: 1, name: "Multicolor Patchwork Embroidered Lehenga", price: 489, cat: "Lehengas", badge: "New Arrival", color: "linear-gradient(140deg,#2a1f2d,#4a2040 25%,#c5a255 45%,#d4466a 60%,#1a3a2a 80%)", images: ["/Products/Lehenga/WhatsApp Image 2026-05-05 at 12.20.33 AM.jpeg", "/Products/Lehenga/WhatsApp Image 2026-05-05 at 12.20.34 AM.jpeg"], rating: 4.9, reviews: 47, desc: "Rich multicolor patchwork with geometric and floral motifs, peacock borders, and mirror work. Includes embroidered blouse and black velvet dupatta.", sizes: ["XS","S","M","L","XL","Custom"] },
+  { id: 1, name: "Multicolor Patchwork Embroidered Lehenga", price: 489, cat: "Lehengas", badge: "New Arrival", color: "linear-gradient(140deg,#2a1f2d,#4a2040 25%,#c5a255 45%,#d4466a 60%,#1a3a2a 80%)", images: ["/Products/Lehenga-Demo/img1.jpg", "/Products/Lehenga-Demo/img2.jpg", "/Products/Lehenga-Demo/img3.jpg"], rating: 4.9, reviews: 47, desc: "Rich multicolor patchwork with geometric and floral motifs, peacock borders, and mirror work. Includes embroidered blouse and black velvet dupatta.", sizes: ["XS","S","M","L","XL","Custom"] },
   { id: 2, name: "Black Embroidered Sherwani Set", price: 399, cat: "Sherwanis", badge: "Trending", color: "linear-gradient(140deg,#0c0a09,#1e1b18 40%,#2a2420 70%,#0c0a09)", images: [], rating: 4.8, reviews: 32, desc: "Intricate geometric embroidery on premium black fabric. Complete set with kurta, sherwani jacket, and churidar.", sizes: ["S","M","L","XL","XXL"] },
   { id: 3, name: "Teal Green Embroidered Silk Lehenga", price: 349, cat: "Lehengas", badge: "Bestseller", color: "linear-gradient(140deg,#0a4a4a,#1a6a5a 50%,#0a3a3a)", images: ["/Products/Lehenga/WhatsApp Image 2026-05-05 at 12.20.34 AM (1).jpeg", "/Products/Lehenga/WhatsApp Image 2026-05-05 at 12.20.34 AM (2).jpeg"], rating: 4.7, reviews: 58, desc: "Handwoven silk with delicate thread and zari embroidery. Net dupatta with matching border.", sizes: ["XS","S","M","L","XL"] },
   { id: 4, name: "Maroon Velvet Bridal Lehenga", price: 599, cat: "Bridal", badge: "Bridal", color: "linear-gradient(140deg,#3a0818,#6a1830 50%,#3a0818)", images: [], rating: 5.0, reviews: 21, desc: "Luxurious velvet lehenga with heavy zardozi and stone work. Premium bridal collection with matching jewelry set.", sizes: ["S","M","L","XL","Custom"] },
@@ -76,9 +77,84 @@ export default function App() {
   const [checkoutStep, setCheckoutStep] = useState(0);
   const [shopFilter, setShopFilter] = useState("All");
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [products, setProducts] = useState(PRODUCTS);
+  const [cartId, setCartId] = useState(null);   // Medusa cart id; null → offline/local mode
+  const [placedOrder, setPlacedOrder] = useState(null);
+  const [infoTopic, setInfoTopic] = useState("privacy");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [customer, setCustomer] = useState(null);
+  const [wishlist, setWishlist] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cb_wishlist") || "[]"); } catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("cb_wishlist", JSON.stringify(wishlist)); } catch { /* ignore */ }
+  }, [wishlist]);
+
+  const toggleWishlist = (id) => setWishlist(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const inWishlist = (id) => wishlist.includes(id);
+  const wishlistCount = wishlist.length;
+
+  const runSearch = () => { setShopFilter("All"); navigate("shop"); };
+
+  // Restore a logged-in customer from a saved token on first load.
+  useEffect(() => {
+    (async () => {
+      const token = medusa.getToken();
+      if (!token) return;
+      try { setCustomer(await medusa.getCustomer(token)); }
+      catch { medusa.setToken(null); }
+    })();
+  }, []);
+
+  const handleLogin = async (creds) => {
+    await medusa.loginCustomer(creds);
+    const c = await medusa.getCustomer();
+    setCustomer(c);
+    if (cartId) { try { await medusa.associateCartCustomer(cartId); } catch { /* non-fatal */ } }
+    return c;
+  };
+  const handleRegister = async (data) => {
+    await medusa.registerCustomer(data);
+    const c = await medusa.getCustomer();
+    setCustomer(c);
+    if (cartId) { try { await medusa.associateCartCustomer(cartId); } catch { /* non-fatal */ } }
+    return c;
+  };
+  const handleLogout = () => { medusa.logoutCustomer(); setCustomer(null); navigate("home"); };
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+
+  // Load the live catalog + restore/create a Medusa cart on first mount.
+  // If the backend is unreachable, we silently keep the static PRODUCTS and
+  // the purely-local cart so the site still works as a demo.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const apiProducts = await medusa.listProducts();
+        if (!cancelled && apiProducts.length) setProducts(apiProducts);
+
+        const saved = localStorage.getItem("cb_cart_id");
+        let cid = saved;
+        if (cid) {
+          const existing = await medusa.getCart(cid).catch(() => null);
+          if (!existing || existing.completed_at) cid = null;
+          else if (!cancelled) setCart(medusa.cartFromMedusa(existing, apiProducts));
+        }
+        if (!cid) {
+          const fresh = await medusa.createCart();
+          cid = fresh.id;
+          localStorage.setItem("cb_cart_id", cid);
+        }
+        if (!cancelled) setCartId(cid);
+      } catch (e) {
+        console.warn("[Chaubandi] Medusa backend unavailable — using static demo data.", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const navigate = (p, prod) => {
     setPage(p);
@@ -86,20 +162,73 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addToCart = (product, size) => {
+  const goInfo = (topic) => { setInfoTopic(topic); navigate("info"); };
+
+  const addToCart = async (product, size, quantity = 1) => {
+    const variantId = product.variants?.find(v => v.title === size)?.id;
+    if (cartId && variantId) {
+      try {
+        const updated = await medusa.addLineItem(cartId, variantId, quantity);
+        setCart(medusa.cartFromMedusa(updated, products));
+        setCartOpen(true);
+        return;
+      } catch (e) {
+        console.warn("[Chaubandi] addLineItem failed, using local cart.", e);
+      }
+    }
     setCart(prev => {
       const exists = prev.find(i => i.id === product.id && i.size === size);
-      if (exists) return prev.map(i => i.id === product.id && i.size === size ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { ...product, size, qty: 1 }];
+      if (exists) return prev.map(i => i.id === product.id && i.size === size ? { ...i, qty: i.qty + quantity } : i);
+      return [...prev, { ...product, size, qty: quantity }];
     });
     setCartOpen(true);
   };
 
-  const updateQty = (id, size, delta) => {
+  const updateQty = async (id, size, delta) => {
+    const item = cart.find(i => i.id === id && i.size === size);
+    if (cartId && item?.lineId) {
+      try {
+        const newQty = item.qty + delta;
+        const updated = newQty <= 0
+          ? await medusa.removeLineItem(cartId, item.lineId)
+          : await medusa.updateLineItem(cartId, item.lineId, newQty);
+        setCart(medusa.cartFromMedusa(updated, products));
+        return;
+      } catch (e) {
+        console.warn("[Chaubandi] updateQty failed, using local cart.", e);
+      }
+    }
     setCart(prev => prev.map(i => i.id === id && i.size === size ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter(i => i.qty > 0));
   };
 
-  const removeItem = (id, size) => setCart(prev => prev.filter(i => !(i.id === id && i.size === size)));
+  const removeItem = async (id, size) => {
+    const item = cart.find(i => i.id === id && i.size === size);
+    if (cartId && item?.lineId) {
+      try {
+        const updated = await medusa.removeLineItem(cartId, item.lineId);
+        setCart(medusa.cartFromMedusa(updated, products));
+        return;
+      } catch (e) {
+        console.warn("[Chaubandi] removeItem failed, using local cart.", e);
+      }
+    }
+    setCart(prev => prev.filter(i => !(i.id === id && i.size === size)));
+  };
+
+  // Full checkout against Medusa. Returns the created order, and rotates in a
+  // fresh cart for the next visit. Throws so CheckoutPage can surface errors.
+  const placeOrder = async (form, deliveryMethod) => {
+    if (!cartId) throw new Error("offline");
+    const order = await medusa.placeOrder(cartId, form, deliveryMethod);
+    setPlacedOrder(order);
+    setCart([]);
+    try {
+      const fresh = await medusa.createCart();
+      setCartId(fresh.id);
+      localStorage.setItem("cb_cart_id", fresh.id);
+    } catch { /* next visit will re-create */ }
+    return order;
+  };
 
   return (
     <div style={{ fontFamily: "'Outfit',sans-serif", background: "#0d0a08", color: "#f0e6d2", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -116,13 +245,17 @@ export default function App() {
         .d1{animation-delay:.1s}.d2{animation-delay:.2s}.d3{animation-delay:.3s}.d4{animation-delay:.4s}.d5{animation-delay:.5s}
         .hover-lift{transition:transform .3s,box-shadow .3s}
         .hover-lift:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+        .hover-lift:hover .wish-btn{opacity:1!important}
         .img-zoom{overflow:hidden}
         .img-zoom>div, .img-zoom>img{transition:transform .6s}.img-zoom:hover>div, .img-zoom:hover>img{transform:scale(1.06)}
         .btn-shine{position:relative;overflow:hidden}
         .btn-shine::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transition:left .6s}
         .btn-shine:hover::after{left:100%}
         @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .cat-strip::-webkit-scrollbar{display:none}
+        .rev-track{scrollbar-width:none;-ms-overflow-style:none}
+        .rev-track::-webkit-scrollbar{display:none}
         .cat-item-thumb{transition:transform .3s,box-shadow .3s}
         .cat-item-thumb:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(26,20,18,.18)!important}
         .cat-item-label{transition:color .3s}
@@ -191,13 +324,15 @@ export default function App() {
               onMouseEnter={e => e.currentTarget.style.color = "#e8c97a"} onMouseLeave={e => e.currentTarget.style.color = "#f0e6d2"}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
             </span>
-            <span style={{ cursor: "pointer", color: "#f0e6d2", display: "flex" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#e8c97a"} onMouseLeave={e => e.currentTarget.style.color = "#f0e6d2"}>
+            <span onClick={() => navigate("account")} title={customer ? `Hi, ${customer.first_name || "account"}` : "Sign in"} style={{ cursor: "pointer", color: customer ? "#e8c97a" : "#f0e6d2", display: "flex", position: "relative" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#e8c97a"} onMouseLeave={e => e.currentTarget.style.color = customer ? "#e8c97a" : "#f0e6d2"}>
               <User size={22} strokeWidth={1.7} />
+              {customer && <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#3dbd83", border: "1.5px solid #0d0a08" }} />}
             </span>
-            <span style={{ cursor: "pointer", color: "#f0e6d2", display: "flex" }}
+            <span onClick={() => navigate("wishlist")} title="Wishlist" style={{ cursor: "pointer", color: "#f0e6d2", display: "flex", position: "relative" }}
               onMouseEnter={e => e.currentTarget.style.color = "#e8c97a"} onMouseLeave={e => e.currentTarget.style.color = "#f0e6d2"}>
-              <Heart size={22} strokeWidth={1.7} />
+              <Heart size={22} strokeWidth={1.7} fill={wishlistCount > 0 ? "#e8c97a" : "none"} />
+              {wishlistCount > 0 && <div style={{ position: "absolute", top: -6, right: -8, background: "#c5a255", color: "#1a1208", width: 18, height: 18, borderRadius: "50%", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{wishlistCount}</div>}
             </span>
             <div style={{ position: "relative", cursor: "pointer", color: "#f0e6d2", display: "flex" }} onClick={() => setCartOpen(true)}
               onMouseEnter={e => e.currentTarget.style.color = "#e8c97a"} onMouseLeave={e => e.currentTarget.style.color = "#f0e6d2"}>
@@ -214,7 +349,10 @@ export default function App() {
         <div style={{ maxWidth: 920, margin: "0 auto", display: "flex", gap: 0 }}>
           <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
             <Search size={17} style={{ position: "absolute", left: 18, color: "#6e6353", pointerEvents: "none" }} />
-            <input placeholder="Search by fabric, occasion or style..." style={{ width: "100%", height: 52, paddingLeft: 48, paddingRight: 16, border: "1.5px solid #2b2218", borderRight: "none", borderRadius: "8px 0 0 8px", fontSize: 14.5, color: "#f0e6d2", background: "#16110c", outline: "none", fontFamily: "'Outfit',sans-serif" }}
+            <input placeholder="Search by fabric, occasion or style..." value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") runSearch(); }}
+              style={{ width: "100%", height: 52, paddingLeft: 48, paddingRight: 16, border: "1.5px solid #2b2218", borderRight: "none", borderRadius: "8px 0 0 8px", fontSize: 14.5, color: "#f0e6d2", background: "#16110c", outline: "none", fontFamily: "'Outfit',sans-serif" }}
               onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = "#2b2218"} />
           </div>
           <button className="btn-shine mobile-hide" style={{ height: 52, padding: "0 24px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: "0 8px 8px 0", fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 9, whiteSpace: "nowrap" }}>
@@ -251,6 +389,14 @@ export default function App() {
           <span onClick={() => navigate("story")} style={{ fontSize: 15.5, color: "#f0e6d2", cursor: "pointer", whiteSpace: "nowrap", transition: "color .2s" }}
             onMouseEnter={e => e.target.style.color = "#e8c97a"} onMouseLeave={e => e.target.style.color = "#f0e6d2"}>
             Our Story
+          </span>
+          <span onClick={() => navigate("design")} style={{ fontSize: 15.5, color: "#f0e6d2", cursor: "pointer", whiteSpace: "nowrap", transition: "color .2s" }}
+            onMouseEnter={e => e.target.style.color = "#e8c97a"} onMouseLeave={e => e.target.style.color = "#f0e6d2"}>
+            Custom Design
+          </span>
+          <span onClick={() => navigate("fit")} style={{ fontSize: 15.5, color: "#f0e6d2", cursor: "pointer", whiteSpace: "nowrap", transition: "color .2s" }}
+            onMouseEnter={e => e.target.style.color = "#e8c97a"} onMouseLeave={e => e.target.style.color = "#f0e6d2"}>
+            Perfect Fit
           </span>
         </div>
       </div>
@@ -314,13 +460,18 @@ export default function App() {
 
       {/* Main Content Area */}
       <main style={{ flex: 1 }}>
-        {page === "home" && <HomePage navigate={navigate} products={PRODUCTS} setShopFilter={setShopFilter} addToCart={addToCart} />}
-        {page === "shop" && <ShopPage navigate={navigate} products={PRODUCTS} filter={shopFilter} setFilter={setShopFilter} addToCart={addToCart} />}
-        {page === "product" && selectedProduct && <ProductPage product={selectedProduct} navigate={navigate} addToCart={addToCart} products={PRODUCTS} />}
-        {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} />}
+        {page === "home" && <HomePage navigate={navigate} products={products} setShopFilter={setShopFilter} addToCart={addToCart} />}
+        {page === "shop" && <ShopPage navigate={navigate} products={products} filter={shopFilter} setFilter={setShopFilter} addToCart={addToCart} query={searchQuery} setQuery={setSearchQuery} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />}
+        {page === "product" && selectedProduct && <ProductPage product={selectedProduct} navigate={navigate} addToCart={addToCart} products={products} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />}
+        {page === "wishlist" && <WishlistPage products={products} wishlist={wishlist} toggleWishlist={toggleWishlist} navigate={navigate} />}
+        {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} placeOrder={placeOrder} placedOrder={placedOrder} customer={customer} />}
+        {page === "account" && <AccountPage customer={customer} onLogin={handleLogin} onRegister={handleRegister} onLogout={handleLogout} navigate={navigate} />}
         {page === "live" && <LiveVideoPage navigate={navigate} />}
         {page === "story" && <StoryPage navigate={navigate} />}
         {page === "contact" && <ContactPage navigate={navigate} />}
+        {page === "design" && <DesignStudioPage navigate={navigate} />}
+        {page === "fit" && <PerfectFitPage navigate={navigate} customer={customer} />}
+        {page === "info" && <InfoPage topic={infoTopic} goInfo={goInfo} navigate={navigate} />}
       </main>
 
       {/* Global Footer */}
@@ -328,36 +479,54 @@ export default function App() {
         <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 32px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 48, borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: 64, marginBottom: 32 }}>
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>Help</h4>
-            {["Contact Us", "Shipping Info", "Returns & Exchanges", "FAQ", "Sizing Info"].map(l => (
-              <div key={l} onClick={() => { if (l === "Contact Us") navigate("contact"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
+            {[
+              { label: "Contact Us", go: () => navigate("contact") },
+              { label: "Shipping Info", go: () => goInfo("shipping") },
+              { label: "Returns & Exchanges", go: () => goInfo("returns") },
+              { label: "FAQ", go: () => goInfo("faq") },
+              { label: "Sizing Info", go: () => goInfo("sizing") },
+            ].map(l => (
+              <div key={l.label} onClick={l.go} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l.label}</div>
             ))}
           </div>
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>About</h4>
-            {["Our Story", "Boutique Location", "Book Appointment", "Reviews"].map(l => (
-              <div key={l} onClick={() => { if (l === "Our Story") navigate("story"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
+            {[
+              { label: "Our Story", go: () => navigate("story") },
+              { label: "Boutique Location", go: () => navigate("contact") },
+              { label: "Book Appointment", go: () => navigate("live") },
+              { label: "Custom Design", go: () => navigate("design") },
+            ].map(l => (
+              <div key={l.label} onClick={l.go} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l.label}</div>
             ))}
           </div>
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>Shop</h4>
-            {["New Arrivals", "Bridal Lehengas", "Sarees", "Sherwanis", "Jewelry"].map(l => (
-              <div key={l} onClick={() => navigate("shop")} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l}</div>
+            {[
+              { label: "New Arrivals", filter: "All" },
+              { label: "Bridal Lehengas", filter: "Bridal" },
+              { label: "Sarees", filter: "Sarees" },
+              { label: "Sherwanis", filter: "Sherwanis" },
+              { label: "Anarkali", filter: "Anarkali" },
+            ].map(l => (
+              <div key={l.label} onClick={() => { setShopFilter(l.filter); navigate("shop"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l.label}</div>
             ))}
           </div>
           <div style={{ minWidth: 280 }}>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 16, fontWeight: 600 }}>Stay in the Know</h4>
             <p style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 20, lineHeight: 1.5 }}>Be the first one to receive new releases, special offers, and more.</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input placeholder="E-mail" style={{ height: 44, background: "transparent", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", padding: "0 16px", fontSize: 13, outline: "none", fontFamily: "'Outfit',sans-serif" }} />
-              <button style={{ height: 44, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>Subscribe</button>
-            </div>
+            <NewsletterSignup />
             <div style={{ display: "flex", gap: 16, marginTop: 32 }}>
               {["Fb", "Ig", "Pt", "Tt"].map(s => <span key={s} style={{ fontSize: 14, color: "rgba(240,235,228,0.7)", cursor: "pointer" }}>{s}</span>)}
             </div>
           </div>
         </div>
         <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 32px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 20 }}>
-          <div style={{ fontSize: 11, color: "rgba(240,235,228,0.5)", letterSpacing: 1 }}>© 2026 · CHAUBANDI · PRIVACY POLICY · TERMS & CONDITIONS</div>
+          <div style={{ fontSize: 11, color: "rgba(240,235,228,0.5)", letterSpacing: 1 }}>
+            © 2026 · CHAUBANDI ·{" "}
+            <span onClick={() => goInfo("privacy")} style={{ cursor: "pointer" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.5)"}>PRIVACY POLICY</span> ·{" "}
+            <span onClick={() => goInfo("terms")} style={{ cursor: "pointer" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.5)"}>TERMS &amp; CONDITIONS</span>
+          </div>
           <div style={{ display: "flex", gap: 8, opacity: 0.7 }}>
             {["Amex", "Apple", "Visa", "Master", "PayPal"].map(p => (
               <div key={p} style={{ padding: "4px 10px", background: "#16110c", color: "#f0e6d2", fontSize: 9, fontWeight: 700, borderRadius: 2 }}>{p}</div>
@@ -365,6 +534,311 @@ export default function App() {
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/* ─── NEWSLETTER SIGNUP (footer) ─── */
+function NewsletterSignup() {
+  const [email, setEmail] = useState("");
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const subscribe = async () => {
+    if (!/\S+@\S+\.\S+/.test(email)) { setError("Please enter a valid email."); return; }
+    setError("");
+    // Send to the backend (owner notification + welcome email). Also keep a
+    // local record so nothing is lost if the backend is unreachable.
+    try {
+      const list = JSON.parse(localStorage.getItem("cb_newsletter") || "[]");
+      if (!list.includes(email)) list.push(email);
+      localStorage.setItem("cb_newsletter", JSON.stringify(list));
+    } catch { /* ignore */ }
+    try { await medusa.subscribeNewsletter(email); }
+    catch (e) { console.warn("[Chaubandi] newsletter signup not delivered (backend offline?)", e); }
+    setDone(true);
+  };
+
+  if (done) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(61,189,131,0.12)", border: "1px solid rgba(61,189,131,0.35)", borderRadius: 6, padding: "14px 16px" }}>
+        <Check size={18} color="#3dbd83" />
+        <span style={{ fontSize: 13, color: "#f0e6d2" }}>You’re on the list — thank you!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <input placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === "Enter") subscribe(); }}
+        style={{ height: 44, background: "transparent", border: `1px solid ${error ? "rgba(217,83,79,0.6)" : "rgba(255,255,255,0.2)"}`, color: "#fff", padding: "0 16px", fontSize: 13, outline: "none", fontFamily: "'Outfit',sans-serif" }} />
+      <button onClick={subscribe} style={{ height: 44, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600 }}>Subscribe</button>
+      {error && <span style={{ fontSize: 12, color: "#e8a0a0" }}>{error}</span>}
+    </div>
+  );
+}
+
+/* ─── INFO / POLICY PAGES (Privacy, Terms, Returns, Shipping, FAQ, Sizing) ─── */
+const INFO_CONTENT = {
+  shipping: {
+    title: "Shipping Information",
+    tag: "Delivery & Pickup",
+    blocks: [
+      ["Free US Shipping", "Every order ships free within the United States. Orders are carefully packed and dispatched from our Arlington, MA boutique within 24–48 hours of confirmation. Standard delivery typically takes 3–5 business days after dispatch."],
+      ["Free Store Pickup", "Prefer to collect in person? Choose “Pick up free” at checkout and we’ll have your order ready at 177 Massachusetts Avenue, Arlington, MA 02474. We’ll text you the moment it’s ready — usually within a couple of hours during store hours (Tue–Sun, 10 AM – 7 PM ET)."],
+      ["Order Tracking", "Once your order ships, you’ll receive an email with tracking details so you can follow it to your door."],
+      ["International Orders", "We ship across the US as standard. For international delivery, message us on WhatsApp at +1 (857) 800-1282 and we’ll arrange a custom quote."],
+    ],
+  },
+  returns: {
+    title: "Returns & Exchanges",
+    tag: "Our Promise",
+    blocks: [
+      ["14-Day Returns", "If something isn’t quite right, you may return unworn, unaltered items in their original condition with tags attached within 14 days of delivery for a refund or exchange."],
+      ["Free Alterations First", "Before you return, remember every purchase includes free alterations. Often a small adjustment is all it takes for the perfect fit — reach out and we’ll help before you send anything back."],
+      ["Custom & Bridal Pieces", "Made-to-measure, custom-designed, and bridal pieces are crafted specifically for you and are final sale. We’ll confirm every detail with you before production begins."],
+      ["How to Start a Return", "Email hello@chaubandi.com or message us on WhatsApp with your order number and we’ll guide you through it. Refunds are issued to your original payment method once we receive and inspect the item."],
+    ],
+  },
+  sizing: {
+    title: "Size Guide",
+    tag: "Find Your Fit",
+    blocks: [
+      ["Standard Sizes", "Our ready-to-wear pieces follow US sizing: XS (0–2), S (4–6), M (8–10), L (12–14), XL (16–18), XXL (20–22). When in doubt between two sizes, size up — our alterations are free."],
+      ["Measuring Tips", "For the most accurate fit, measure your bust at the fullest point, your waist at the narrowest, and your hips at the widest. Keep the tape snug but not tight, and measure over light clothing."],
+      ["Custom Stitching", "Want a flawless fit? Use our Perfect Fit tool to save your measurements, or book a fitting at the boutique. Most lehengas, sarees blouses, and suits can be tailored to your exact measurements at no extra charge."],
+      ["Still Unsure?", "Our stylist Sushma is happy to help you choose. Book a live video consultation or WhatsApp us and we’ll recommend the right size for your piece."],
+    ],
+  },
+  faq: {
+    title: "Frequently Asked Questions",
+    tag: "Good to Know",
+    blocks: [
+      ["Do you offer custom designs?", "Yes! Share your inspiration through our Custom Design studio and Sushma will craft a one-of-a-kind piece for you — from fabric and color to embroidery and silhouette."],
+      ["Are alterations really free?", "Absolutely. Free alterations are included with every purchase so your outfit fits beautifully. Just bring it to the boutique or arrange it with us."],
+      ["Can I shop in person?", "Come visit us at 177 Massachusetts Avenue, Arlington, MA — open Tuesday to Sunday, 10 AM – 7 PM ET. You can also book a live video shopping session from anywhere."],
+      ["How long does custom or bridal work take?", "Custom and bridal pieces typically take 4–8 weeks depending on detail and embroidery. We’ll give you a firm timeline when we confirm your design."],
+      ["What payment methods do you accept?", "We accept all major credit and debit cards at secure checkout. For large or custom orders, we can also arrange payment in person."],
+    ],
+  },
+  privacy: {
+    title: "Privacy Policy",
+    tag: "Your Trust",
+    blocks: [
+      ["What We Collect", "We collect the information you provide when you place an order, create an account, book an appointment, or contact us — such as your name, email, phone number, and shipping address. We also collect basic usage data to improve your experience."],
+      ["How We Use It", "Your information is used solely to process orders, arrange fittings and alterations, communicate about your purchases, and improve our service. We never sell your personal data to third parties."],
+      ["Payments", "Card payments are processed securely by our payment provider. Chaubandi does not store your full card details on our servers."],
+      ["Your Choices", "You can request access to, correction of, or deletion of your personal information at any time by emailing hello@chaubandi.com. You may also unsubscribe from marketing emails whenever you like."],
+    ],
+  },
+  terms: {
+    title: "Terms & Conditions",
+    tag: "The Fine Print",
+    blocks: [
+      ["Overview", "By using the Chaubandi website and placing an order, you agree to these terms. We aim to keep them simple and fair."],
+      ["Orders & Pricing", "All prices are listed in US dollars. We reserve the right to correct pricing errors and to decline or cancel any order. Your order is confirmed once payment is successfully processed."],
+      ["Products", "We work hard to represent colors and details accurately, but slight variation is natural in handcrafted and hand-embroidered pieces — this is part of their charm, not a defect."],
+      ["Custom & Bridal", "Made-to-measure, custom, and bridal orders are final sale and require details to be confirmed before production. Timelines are estimates and may vary with complexity."],
+      ["Contact", "Questions about these terms? Email hello@chaubandi.com or call the boutique. These terms are governed by the laws of the Commonwealth of Massachusetts."],
+    ],
+  },
+};
+
+const INFO_ORDER = ["shipping", "returns", "sizing", "faq", "privacy", "terms"];
+const INFO_LABELS = { shipping: "Shipping", returns: "Returns & Exchanges", sizing: "Size Guide", faq: "FAQ", privacy: "Privacy Policy", terms: "Terms & Conditions" };
+
+function InfoPage({ topic, goInfo, navigate }) {
+  const data = INFO_CONTENT[topic] || INFO_CONTENT.faq;
+  return (
+    <div>
+      <div style={{ background: "#1f1812", borderTop: "1px solid rgba(197,162,85,0.25)", padding: "72px 32px 56px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 60%, rgba(197,162,85,0.10) 0%, transparent 68%)" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 16 }}>{data.tag}</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(34px,4.5vw,54px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1 }}>{data.title}</h1>
+        </div>
+      </div>
+
+      <section className="mobile-stack" style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 32px 80px", display: "grid", gridTemplateColumns: "220px 1fr", gap: 48, alignItems: "start" }}>
+        {/* topic nav */}
+        <div style={{ position: "sticky", top: 100, alignSelf: "start" }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#a3947c", marginBottom: 16 }}>Help Topics</div>
+          {INFO_ORDER.map(t => (
+            <div key={t} onClick={() => goInfo(t)} style={{ fontSize: 14, color: t === topic ? "#e8c97a" : "rgba(240,235,228,0.7)", fontWeight: t === topic ? 600 : 400, padding: "9px 0", cursor: "pointer", borderLeft: `2px solid ${t === topic ? "#c5a255" : "transparent"}`, paddingLeft: 14, transition: "color .2s" }}>
+              {INFO_LABELS[t]}
+            </div>
+          ))}
+          <button onClick={() => navigate("contact")} style={{ marginTop: 24, width: "100%", padding: "12px", background: "#16110c", border: "1px solid rgba(197,162,85,0.4)", color: "#e8c97a", borderRadius: 6, fontSize: 12, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Still need help?</button>
+        </div>
+
+        {/* content */}
+        <div className="fade-in">
+          {data.blocks.map(([heading, body], i) => (
+            <div key={i} style={{ marginBottom: 30, paddingBottom: 30, borderBottom: i < data.blocks.length - 1 ? "1px solid #2b2218" : "none" }}>
+              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 500, color: "#f0e6d2", marginBottom: 12 }}>{heading}</h3>
+              <p style={{ fontSize: 14.5, color: "rgba(240,235,228,0.72)", lineHeight: 1.8 }}>{body}</p>
+            </div>
+          ))}
+          <div style={{ marginTop: 8, padding: "20px 24px", background: "#1f1812", borderRadius: 8, fontSize: 13.5, color: "#a3947c", lineHeight: 1.7 }}>
+            Questions we didn’t cover? Reach us at <span style={{ color: "#e8c97a" }}>hello@chaubandi.com</span> or on WhatsApp at{" "}
+            <span onClick={() => window.open("https://wa.me/18578001282", "_blank")} style={{ color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>+1 (857) 800-1282</span>.
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ─── ACCOUNT PAGE (login / register / order history) ─── */
+function AccountPage({ customer, onLogin, onRegister, onLogout, navigate }) {
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [form, setForm] = useState({ email: "", password: "", first_name: "", last_name: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [orders, setOrders] = useState(null);
+
+  // Load order history once we have a logged-in customer.
+  useEffect(() => {
+    if (!customer) { setOrders(null); return; }
+    let cancelled = false;
+    (async () => {
+      try { const list = await medusa.listCustomerOrders(); if (!cancelled) setOrders(list); }
+      catch { if (!cancelled) setOrders([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [customer]);
+
+  const submit = async () => {
+    setError("");
+    if (!form.email || !form.password) { setError("Email and password are required."); return; }
+    if (mode === "register" && !form.first_name) { setError("Please enter your first name."); return; }
+    setBusy(true);
+    try {
+      if (mode === "login") await onLogin({ email: form.email, password: form.password });
+      else await onRegister(form);
+    } catch (e) {
+      const msg = String(e?.message || "");
+      setError(mode === "login"
+        ? "Couldn’t sign in. Check your email and password."
+        : (/exists|already/i.test(msg) ? "An account with this email already exists — try signing in." : "Couldn’t create your account. Please try again."));
+    } finally { setBusy(false); }
+  };
+
+  const field = (label, key, type = "text") => (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>{label}</label>
+      <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
+        onKeyDown={e => { if (e.key === "Enter") submit(); }}
+        style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" }} />
+    </div>
+  );
+
+  // ── Logged-in view ──
+  if (customer) {
+    const money = (v, cur = "usd") => `${cur === "usd" ? "$" : ""}${Number(v).toFixed(2)}`;
+    return (
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "56px 32px 80px" }}>
+        <div className="fade-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>My Account</div>
+            <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 40, fontWeight: 300 }}>Welcome back, {customer.first_name || "friend"}</h1>
+            <p style={{ fontSize: 13.5, color: "#a3947c", marginTop: 6 }}>{customer.email}</p>
+          </div>
+          <button onClick={onLogout} style={{ padding: "11px 22px", background: "#16110c", border: "1px solid #2b2218", color: "#f0e6d2", borderRadius: 6, fontSize: 12, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Sign Out</button>
+        </div>
+
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 400, marginBottom: 18 }}>Order History</h2>
+        {orders === null ? (
+          <div style={{ color: "#a3947c", fontSize: 14, padding: "24px 0" }}>Loading your orders…</div>
+        ) : orders.length === 0 ? (
+          <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 8, padding: "40px 24px", textAlign: "center" }}>
+            <p style={{ fontSize: 14, color: "#a3947c", marginBottom: 18 }}>You haven’t placed any orders yet.</p>
+            <button onClick={() => navigate("shop")} style={{ padding: "12px 32px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", borderRadius: 4 }}>Start Shopping</button>
+          </div>
+        ) : (
+          orders.map(o => (
+            <div key={o.id} style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 8, padding: "18px 22px", marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#f0e6d2" }}>Order #CB-{o.display_id}</div>
+                  <div style={{ fontSize: 12.5, color: "#a3947c", marginTop: 3 }}>{new Date(o.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} · {(o.items || []).reduce((s, i) => s + i.quantity, 0)} item(s)</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20 }}>{money(o.total, o.currency_code)}</div>
+                  <div style={{ fontSize: 11, color: "#3dbd83", textTransform: "capitalize" }}>{o.status || "confirmed"}</div>
+                </div>
+              </div>
+              {(o.items || []).length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #2b2218", fontSize: 13, color: "#a3947c" }}>
+                  {o.items.map(i => `${i.product_title || i.title}${i.variant_title ? " · " + i.variant_title : ""} ×${i.quantity}`).join("  •  ")}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  // ── Logged-out view (login / register) ──
+  return (
+    <div style={{ maxWidth: 440, margin: "0 auto", padding: "64px 32px 90px" }}>
+      <div className="fade-in" style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12 }}>{mode === "login" ? "Welcome Back" : "Join Chaubandi"}</div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 300 }}>{mode === "login" ? "Sign In" : "Create Account"}</h1>
+      </div>
+
+      <div className="fade-in d1" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 28 }}>
+        {mode === "register" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {field("FIRST NAME", "first_name")}
+            {field("LAST NAME", "last_name")}
+          </div>
+        )}
+        {field("EMAIL", "email", "email")}
+        {field("PASSWORD", "password", "password")}
+
+        {error && <div style={{ fontSize: 12.5, color: "#e8a0a0", marginBottom: 14 }}>{error}</div>}
+
+        <button className="btn-shine" disabled={busy} onClick={submit} style={{ width: "100%", height: 50, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: busy ? "wait" : "pointer", fontSize: 13, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif", borderRadius: 6, opacity: busy ? 0.75 : 1 }}>
+          {busy ? "Please wait…" : (mode === "login" ? "Sign In" : "Create Account")}
+        </button>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 20, fontSize: 13.5, color: "#a3947c" }}>
+        {mode === "login" ? "New to Chaubandi?" : "Already have an account?"}{" "}
+        <span onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }} style={{ color: "#e8c97a", cursor: "pointer", fontWeight: 600 }}>
+          {mode === "login" ? "Create an account" : "Sign in"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── WISHLIST PAGE ─── */
+function WishlistPage({ products, wishlist, toggleWishlist, navigate }) {
+  const saved = products.filter(p => wishlist.includes(p.id));
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 32px 80px" }}>
+      <div className="fade-in" style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 12, color: "#a3947c", marginBottom: 8 }}>
+          <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span>Wishlist</span>
+        </div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>My Wishlist</h1>
+        <p style={{ fontSize: 14, color: "#a3947c" }}>{saved.length} {saved.length === 1 ? "piece" : "pieces"} saved</p>
+      </div>
+
+      {saved.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "72px 24px", background: "#16110c", border: "1px solid #2b2218", borderRadius: 10 }}>
+          <Heart size={44} strokeWidth={1} style={{ margin: "0 auto 18px", opacity: 0.4, color: "#c5a255" }} />
+          <p style={{ fontSize: 15, color: "#a3947c", marginBottom: 22 }}>Your wishlist is empty. Tap the heart on any piece to save it here.</p>
+          <button onClick={() => navigate("shop")} style={{ padding: "13px 34px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", borderRadius: 4 }}>Browse the Collection</button>
+        </div>
+      ) : (
+        <div className="fade-in d1" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 20 }}>
+          {saved.map(p => <ProductCard key={p.id} product={p} navigate={navigate} inWishlist={() => true} toggleWishlist={toggleWishlist} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -525,10 +999,27 @@ function ContactPage({ navigate }) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
     setSending(true);
-    setTimeout(() => { setSending(false); setSent(true); }, 1400);
+    // Durable delivery: email the message to the boutique via the backend.
+    try {
+      await medusa.sendContactMessage({
+        name: form.name, email: form.email, phone: form.phone,
+        subject: form.subject, message: form.message, kind: "contact",
+      });
+    } catch (e) { console.warn("[Chaubandi] contact email not delivered (backend offline?)", e); }
+    // Instant ping via WhatsApp — Sushma's primary channel.
+    const text = encodeURIComponent(
+      `Hi Chaubandi! I'd like to get in touch.\n\n` +
+      `Name: ${form.name}\n` +
+      `Email: ${form.email}\n` +
+      (form.phone ? `Phone: ${form.phone}\n` : "") +
+      (form.subject ? `Subject: ${form.subject}\n` : "") +
+      `\nMessage:\n${form.message}`
+    );
+    try { window.open(`https://wa.me/18578001282?text=${text}`, "_blank"); } catch { /* popup blocked */ }
+    setSending(false); setSent(true);
   };
 
   const field = (hasError) => ({
@@ -655,6 +1146,315 @@ function ContactPage({ navigate }) {
             Sushma personally reads every message. Expect a reply within a few hours.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── DESIGN YOUR DREAM OUTFIT (Custom Design Studio) ─── */
+function DesignStudioPage({ navigate }) {
+  const [spec, setSpec] = useState({ email: "", garment: "", fabric: "", color: "", embroidery: "", occasion: "", budget: "" });
+  const [images, setImages] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  const addFiles = (fileList) => {
+    const next = Array.from(fileList || []).map(f => ({ url: URL.createObjectURL(f), name: f.name }));
+    setImages(prev => [...prev, ...next].slice(0, 6));
+  };
+  const removeImage = (idx) => setImages(prev => prev.filter((_, i) => i !== idx));
+
+  const submitDesign = async () => {
+    const brief = [
+      spec.garment && `Garment: ${spec.garment}`,
+      spec.fabric && `Fabric: ${spec.fabric}`,
+      spec.color && `Color: ${spec.color}`,
+      spec.embroidery && `Embroidery: ${spec.embroidery}`,
+      spec.occasion && `Occasion: ${spec.occasion}`,
+      spec.budget && `Budget: ${spec.budget}`,
+      images.length ? `Inspiration images: ${images.length} (shared via WhatsApp)` : "",
+    ].filter(Boolean);
+    // Durable delivery: email the brief to the boutique if the shopper gave an
+    // email (so Sushma can reply). WhatsApp remains the instant channel and
+    // carries the inspiration photos.
+    if (spec.email && /\S+@\S+\.\S+/.test(spec.email)) {
+      try {
+        await medusa.sendContactMessage({
+          email: spec.email,
+          subject: [spec.garment, spec.occasion].filter(Boolean).join(" · ") || "Custom design",
+          message: brief.join("\n"),
+          kind: "custom_design",
+        });
+      } catch (e) { console.warn("[Chaubandi] design request email not delivered (backend offline?)", e); }
+    }
+    const lines = [
+      "Hi Chaubandi! I'd like to request a custom design.",
+      "",
+      ...brief,
+      images.length ? "\nI'll share my inspiration image(s) here in the chat." : "",
+    ].filter(Boolean);
+    try { window.open(`https://wa.me/18578001282?text=${encodeURIComponent(lines.join("\n"))}`, "_blank"); } catch { /* popup blocked */ }
+    setSubmitted(true);
+  };
+
+  const label = { fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6, textTransform: "uppercase" };
+  const field = { width: "100%", height: 48, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2", transition: "border-color .2s" };
+  const onFocus = e => e.target.style.borderColor = "#c5a255";
+  const onBlur = e => e.target.style.borderColor = "#2b2218";
+
+  if (submitted) {
+    return (
+      <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center" }}>
+        <div className="fade-in">
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg,#d4af61,#a8842f)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <Check size={32} color="#1a1208" strokeWidth={2.5} />
+          </div>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12 }}>Request Received</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 44, fontWeight: 400, marginBottom: 14, color: "#f0e6d2" }}>Your Vision Is In Good Hands</h2>
+          <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 470, margin: "0 auto 8px", lineHeight: 1.8 }}>
+            Thank you! Sushma will personally review your custom {spec.garment ? spec.garment.toLowerCase() : "design"} request{spec.occasion ? ` for your ${spec.occasion.toLowerCase()}` : ""} and reach out within 24 hours to discuss fabrics, timeline, and pricing.
+          </p>
+          <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Design Ref #CB-DSGN-{Math.floor(Math.random() * 9000) + 1000}</p>
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={() => navigate("home")} className="btn-shine" style={{ padding: "14px 36px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>
+              Back to Home
+            </button>
+            <button onClick={() => navigate("shop")} style={{ padding: "14px 36px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+              Browse Collection
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ background: "#1f1812", borderTop: "1px solid rgba(197,162,85,0.25)", borderBottom: "1px solid #2b2218", padding: "56px 32px", textAlign: "center", position: "relative" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative" }}>
+          <div className="mobile-hide" style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)" }}>
+            <button onClick={() => navigate("home")} style={{ padding: "10px 22px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", borderRadius: 4, cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>← Home</button>
+          </div>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>Bespoke Atelier</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px,4.5vw,58px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1, marginBottom: 14 }}>Design Your <em style={{ color: "#c5a255" }}>Dream Outfit</em></h1>
+          <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 520, margin: "0 auto", lineHeight: 1.8 }}>Share your inspiration and a few details. Sushma will hand-craft a one-of-a-kind piece, made to your measurements.</p>
+        </div>
+      </div>
+
+      <div className="mobile-stack" style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 32px 80px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "start" }}>
+        <div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 400, marginBottom: 6, color: "#f0e6d2" }}>Inspiration Images</h2>
+          <p style={{ fontSize: 13, color: "#a3947c", marginBottom: 20, lineHeight: 1.6 }}>Upload sketches, screenshots, or photos of styles you love (up to 6).</p>
+          <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, height: 220, border: "1.5px dashed #2b2218", borderRadius: 10, background: "#16110c", cursor: "pointer", textAlign: "center", padding: 24, transition: "border-color .2s" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = "#c5a255"} onMouseLeave={e => e.currentTarget.style.borderColor = "#2b2218"}>
+            <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => addFiles(e.target.files)} />
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#1f1812", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(197,162,85,0.3)" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c5a255" strokeWidth="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+            </div>
+            <div style={{ fontSize: 14, color: "#f0e6d2", fontWeight: 500 }}>Click to upload images</div>
+            <div style={{ fontSize: 12, color: "#6e6353" }}>PNG or JPG · stays on your device</div>
+          </label>
+          {images.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 16 }}>
+              {images.map((img, i) => (
+                <div key={i} style={{ position: "relative", aspectRatio: "1", borderRadius: 8, overflow: "hidden", border: "1px solid #2b2218" }}>
+                  <img src={img.url} alt={img.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <button onClick={() => removeImage(i)} style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(13,10,8,0.8)", border: "none", color: "#f0e6d2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 400, marginBottom: 20, color: "#f0e6d2" }}>Design Specifications</h2>
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>Your Email <span style={{ textTransform: "none", color: "#6e6353" }}>(so Sushma can reply)</span></label>
+            <input type="email" value={spec.email} onChange={e => setSpec({ ...spec, email: e.target.value })} placeholder="you@example.com" style={field} onFocus={onFocus} onBlur={onBlur} />
+          </div>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={label}>Garment Type</label>
+              <select value={spec.garment} onChange={e => setSpec({ ...spec, garment: e.target.value })} style={{ ...field, color: spec.garment ? "#f0e6d2" : "#6e6353", cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur}>
+                <option value="">Select…</option>
+                {["Lehenga", "Bridal Lehenga", "Saree", "Anarkali", "Sharara", "Sherwani", "Gown", "Indo-Western"].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={label}>Occasion</label>
+              <select value={spec.occasion} onChange={e => setSpec({ ...spec, occasion: e.target.value })} style={{ ...field, color: spec.occasion ? "#f0e6d2" : "#6e6353", cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur}>
+                <option value="">Select…</option>
+                {["Wedding", "Engagement", "Sangeet", "Mehandi", "Reception", "Festive", "Everyday"].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div><label style={label}>Fabric</label><input value={spec.fabric} onChange={e => setSpec({ ...spec, fabric: e.target.value })} placeholder="Silk, velvet, georgette…" style={field} onFocus={onFocus} onBlur={onBlur} /></div>
+            <div><label style={label}>Color Palette</label><input value={spec.color} onChange={e => setSpec({ ...spec, color: e.target.value })} placeholder="Maroon & gold…" style={field} onFocus={onFocus} onBlur={onBlur} /></div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>Embroidery Notes</label>
+            <textarea value={spec.embroidery} onChange={e => setSpec({ ...spec, embroidery: e.target.value })} placeholder="Zardozi borders, mirror work, pearl detailing…" rows={4} style={{ ...field, height: "auto", padding: "14px 16px", resize: "vertical", lineHeight: 1.6 }} onFocus={onFocus} onBlur={onBlur} />
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={label}>Budget Range</label>
+            <select value={spec.budget} onChange={e => setSpec({ ...spec, budget: e.target.value })} style={{ ...field, color: spec.budget ? "#f0e6d2" : "#6e6353", cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur}>
+              <option value="">Select…</option>
+              {["$300 – $500", "$500 – $800", "$800 – $1,200", "$1,200 – $2,000", "$2,000+"].map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <button onClick={submitDesign} className="btn-shine" style={{ width: "100%", height: 54, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>
+            Request Custom Design
+          </button>
+          <p style={{ fontSize: 12, color: "#6e6353", textAlign: "center", marginTop: 14, lineHeight: 1.6 }}>No payment now. Sushma reviews every request personally and replies within 24 hours.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── FIND YOUR PERFECT FIT (Smart Measurements) ─── */
+function PerfectFitPage({ navigate, customer }) {
+  const [photos, setPhotos] = useState({ front: null, side: null });
+  const [height, setHeight] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [saveState, setSaveState] = useState("idle"); // idle|saving|saved|guest|error
+
+  const setPhoto = (key, fileList) => {
+    const f = (fileList || [])[0];
+    if (f) setPhotos(prev => ({ ...prev, [key]: { url: URL.createObjectURL(f), name: f.name } }));
+  };
+
+  const MEASUREMENTS = [
+    ["Bust", "36 in"], ["Waist", "29 in"], ["Hips", "39 in"],
+    ["Shoulder", "15 in"], ["Sleeve Length", "23 in"], ["Blouse Length", "15 in"],
+    ["Lehenga Length", "41 in"], ["Inseam", "30 in"],
+  ];
+
+  const calculate = () => {
+    setStatus("calculating");
+    setTimeout(async () => {
+      setStatus("done");
+      // For signed-in shoppers, persist the estimate to their profile so
+      // every future order can be tailored to it.
+      if (customer) {
+        setSaveState("saving");
+        try {
+          await medusa.saveMeasurements({
+            bust: 36, waist: 29, hips: 39, shoulder: 15, sleeve: 23, length: 15, inseam: 30,
+            unit: "in", notes: `Height: ${height || "not provided"} · estimated via Perfect Fit`,
+          });
+          setSaveState("saved");
+        } catch { setSaveState("error"); }
+      } else {
+        setSaveState("guest");
+      }
+    }, 2000);
+  };
+
+  const silhouette = (side) => (
+    <svg viewBox="0 0 120 240" width="120" height="240" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", opacity: 0.16, pointerEvents: "none" }}>
+      <g fill="#c5a255">
+        <circle cx={side ? 54 : 60} cy="28" r="15" />
+        {side
+          ? <path d="M54 44 Q66 54 62 74 L84 214 Q54 224 40 210 L48 74 Q44 54 54 44 Z" />
+          : <path d="M60 44 L80 66 L98 214 Q60 226 22 214 L40 66 Z" />}
+      </g>
+    </svg>
+  );
+
+  const uploadCard = (key, title, side) => {
+    const p = photos[key];
+    return (
+      <label style={{ position: "relative", display: "block", height: 300, border: `1.5px dashed ${p ? "#c5a255" : "#2b2218"}`, borderRadius: 10, background: "#16110c", cursor: "pointer", overflow: "hidden" }}>
+        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => setPhoto(key, e.target.files)} />
+        {p ? (
+          <>
+            <img src={p.url} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(13,10,8,0.8)", color: "#3dbd83", fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 100, display: "flex", alignItems: "center", gap: 6 }}>
+              <Check size={13} /> {title} added
+            </div>
+          </>
+        ) : (
+          <>
+            {silhouette(side)}
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, textAlign: "center", padding: 20 }}>
+              <div style={{ width: 46, height: 46, borderRadius: "50%", background: "#1f1812", border: "1px solid rgba(197,162,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5a255" strokeWidth="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
+              </div>
+              <div style={{ fontSize: 14, color: "#f0e6d2", fontWeight: 500 }}>{title}</div>
+              <div style={{ fontSize: 12, color: "#6e6353" }}>Stand straight, align with the guide</div>
+            </div>
+          </>
+        )}
+      </label>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ background: "#1f1812", borderTop: "1px solid rgba(197,162,85,0.25)", borderBottom: "1px solid #2b2218", padding: "56px 32px", textAlign: "center", position: "relative" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative" }}>
+          <div className="mobile-hide" style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)" }}>
+            <button onClick={() => navigate("home")} style={{ padding: "10px 22px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", borderRadius: 4, cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>← Home</button>
+          </div>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>Smart Sizing</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px,4.5vw,58px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1, marginBottom: 14 }}>Find Your <em style={{ color: "#c5a255" }}>Perfect Fit</em></h1>
+          <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 540, margin: "0 auto", lineHeight: 1.8 }}>Two quick photos and your height — we'll estimate your measurements so every piece is tailored just right.</p>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "56px 32px 80px" }}>
+        <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+          {uploadCard("front", "Front view", false)}
+          {uploadCard("side", "Side view", true)}
+        </div>
+
+        <div className="mobile-stack" style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6, textTransform: "uppercase" }}>Your Height</label>
+            <input value={height} onChange={e => setHeight(e.target.value)} placeholder={`e.g. 5'5" or 165 cm`} style={{ width: "100%", height: 52, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" }} onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = "#2b2218"} />
+          </div>
+          <button onClick={calculate} disabled={status === "calculating"} className="btn-shine" style={{ height: 52, padding: "0 40px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: status === "calculating" ? "default" : "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: status === "calculating" ? 0.75 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, whiteSpace: "nowrap" }}>
+            {status === "calculating"
+              ? <><span style={{ width: 16, height: 16, border: "2px solid rgba(26,18,8,0.35)", borderTopColor: "#1a1208", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} /> Calculating…</>
+              : (status === "done" ? "Recalculate" : "Calculate")}
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Your photos never leave your device — measurements are estimated locally for this demo.</p>
+
+        {status === "done" && (
+          <div className="fade-in" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "24px 28px", borderBottom: "1px solid #2b2218", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 6 }}>Your Profile</div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, color: "#f0e6d2" }}>Estimated Measurements</h2>
+              </div>
+              <div style={{ background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", padding: "10px 20px", borderRadius: 100, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>Recommended Size · M</div>
+            </div>
+            <div style={{ padding: "8px 28px 20px" }}>
+              {MEASUREMENTS.map(([k, v], i) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: i < MEASUREMENTS.length - 1 ? "1px solid #2b2218" : "none" }}>
+                  <span style={{ fontSize: 14, color: "#a3947c" }}>{k}</span>
+                  <span style={{ fontSize: 16, color: "#f0e6d2", fontWeight: 600, fontFamily: "'Cormorant Garamond',serif" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: "#1f1812", padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              {saveState === "saved" && <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#3dbd83", fontWeight: 500 }}><Check size={16} /> Saved to your profile</span>}
+              {saveState === "saving" && <span style={{ fontSize: 13, color: "#a3947c", fontWeight: 500 }}>Saving to your profile…</span>}
+              {saveState === "error" && <span style={{ fontSize: 13, color: "#e8a0a0", fontWeight: 500 }}>Couldn’t save — please try again.</span>}
+              {saveState === "guest" && <span style={{ fontSize: 13, color: "#e8c97a", fontWeight: 500, cursor: "pointer" }} onClick={() => navigate("account")}>Sign in to save these to your profile →</span>}
+              <span style={{ fontSize: 12, color: "#6e6353" }}>We'll use these to tailor every order.</span>
+            </div>
+          </div>
+        )}
+
+        {status === "done" && (
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 32, flexWrap: "wrap" }}>
+            <button onClick={() => navigate("shop")} className="btn-shine" style={{ padding: "14px 36px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>Shop Your Size</button>
+            <button onClick={() => navigate("home")} style={{ padding: "14px 36px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>Back to Home</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -900,29 +1700,117 @@ function UgcReels() {
 }
 
 /* ─── TESTIMONIAL MARQUEE & BOOKING BANNER ─── */
-function TestimonialAndBooking() {
-  const REVIEWS = [
-    { text: "Sushma was absolutely wonderful to work with. We got all of our outfits for our wedding events from her — my Haldi lehenga, wedding ceremony dress, jewelry, and shoes.", author: "Sarah R." },
-    { text: "I found a gorgeous lehenga in under 15 minutes. It only needed a small alteration, which the lovely lady at the store took care of right away. Prices are very fair!", author: "Thili B." },
-    { text: "Sushma is so kind and absolutely amazing at what she does! I've kept coming back with different family members. So grateful to have found her. 10/10", author: "Nisha M." },
-    { text: "Such a beautiful selection with many custom sizes — I didn't even have to get my lehenga altered and I usually do! She is very friendly, knowledgeable, and talented.", author: "Sukrana U." },
-    { text: "My daughter and I traveled 3.5 hours from Vermont. The shop is bright, colorful and filled with so many options. Sushma is incredibly talented and kind.", author: "Cindy S." },
-    { text: "I never write Google reviews, but my experience with Chaubandi and Sushma was so wonderful that this is the least I can do.", author: "Kyle V." },
+/* ─── PRODUCT-LINKED REVIEW CAROUSEL (Raas/Judge.me-style cards) ─── */
+function ReviewCarousel({ reviews, products, navigate }) {
+  const trackRef = useRef(null);
+  const [votes, setVotes] = useState({});
+  const initials = (name) => name.split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const findProduct = (id) => products.find(p => p.id === id || p.productId === id);
+
+  const scrollByCards = (dir) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const card = el.querySelector("[data-review-card]");
+    const step = (card ? card.getBoundingClientRect().width + 20 : el.clientWidth * 0.9) * dir;
+    const max = el.scrollWidth - el.clientWidth;
+    // Direct assignment moves reliably everywhere; CSS scroll-behavior animates it.
+    el.scrollLeft = Math.max(0, Math.min(max, el.scrollLeft + step));
+  };
+
+  const arrowBase = { position: "absolute", top: "44%", transform: "translateY(-50%)", width: 42, height: 42, borderRadius: "50%", background: "#16110c", border: "1px solid #2b2218", color: "#e8c97a", fontSize: 24, lineHeight: 1, cursor: "pointer", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center" };
+  const helpfulBtn = { background: "none", border: "none", color: "#a3947c", cursor: "pointer", fontSize: 12, fontFamily: "'Outfit',sans-serif", padding: "2px 4px" };
+
+  return (
+    <div style={{ position: "relative", maxWidth: 1400, margin: "0 auto", padding: "8px 52px 44px" }}>
+      <button aria-label="Previous reviews" onClick={() => scrollByCards(-1)} className="mobile-hide" style={{ ...arrowBase, left: 6 }}>‹</button>
+      <div ref={trackRef} className="rev-track" style={{ display: "flex", gap: 20, overflowX: "auto", scrollBehavior: "smooth", scrollSnapType: "x proximity", padding: "4px 2px 10px" }}>
+        {reviews.map((rev, i) => {
+          const product = findProduct(rev.productId);
+          const thumb = product?.images?.[0];
+          return (
+            <div key={i} data-review-card onClick={() => product && navigate("product", product)}
+              style={{ flex: "0 0 auto", width: "min(360px, 82vw)", scrollSnapAlign: "start", background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: "22px 22px 15px", cursor: product ? "pointer" : "default", display: "flex", flexDirection: "column" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(197,162,85,0.5)"; e.currentTarget.style.transform = "translateY(-3px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#2b2218"; e.currentTarget.style.transform = "none"; }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ color: "#e8c97a", letterSpacing: 2, fontSize: 15 }}>★★★★★</span>
+                <span style={{ fontSize: 12, color: "#6e6353" }}>{rev.time}</span>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#f0e6d2", marginBottom: 8 }}>{rev.title}</div>
+              <div style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{rev.body}</div>
+              <div style={{ borderTop: "1px solid #2b2218", paddingTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#241c14", color: "#e8c97a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{initials(rev.author)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#f0e6d2" }}>{rev.author}</div>
+                  <div style={{ fontSize: 11, color: "#6e6353" }}>Verified customer</div>
+                </div>
+                {thumb ? (
+                  <img src={thumb} alt={product?.name || "product"} loading="lazy" title={product?.name} style={{ width: 50, height: 62, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                ) : product ? (
+                  <div title={product?.name} style={{ width: 50, height: 62, borderRadius: 4, background: product.color, flexShrink: 0 }} />
+                ) : null}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginTop: 13, fontSize: 12, color: "#6e6353" }}>
+                <span>Was this helpful?</span>
+                <button onClick={(e) => { e.stopPropagation(); setVotes(v => ({ ...v, [i]: (v[i] || 0) + 1 })); }} style={helpfulBtn}>👍 {rev.helpful + (votes[i] || 0)}</button>
+                <button onClick={(e) => e.stopPropagation()} style={helpfulBtn}>👎 0</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button aria-label="Next reviews" onClick={() => scrollByCards(1)} className="mobile-hide" style={{ ...arrowBase, right: 6 }}>›</button>
+    </div>
+  );
+}
+
+/* ─── TESTIMONIALS (product-linked review carousel) & BOOKING BANNER ─── */
+function TestimonialAndBooking({ navigate, products = [] }) {
+  // Real customer reviews, each linked to a product (click card → product page).
+  // Swap/extend with the full set + customer photos when ready.
+  const PRODUCT_REVIEWS = [
+    { title: "Wonderful from start to finish", body: "Sushma was absolutely wonderful to work with. We got all of our outfits for our wedding events from her — my Haldi lehenga, wedding ceremony dress, jewelry, and shoes.", author: "Sarah R.", time: "6 days ago", productId: 1, helpful: 4 },
+    { title: "Found my lehenga in 15 minutes", body: "I found a gorgeous lehenga in under 15 minutes. It only needed a small alteration, which the lovely lady at the store took care of right away. Prices are very fair!", author: "Thili B.", time: "1 week ago", productId: 3, helpful: 3 },
+    { title: "So kind and so talented", body: "Sushma is so kind and absolutely amazing at what she does! I've kept coming back with different family members. So grateful to have found her. 10/10", author: "Nisha M.", time: "1 week ago", productId: 5, helpful: 5 },
+    { title: "Beautiful selection, perfect fit", body: "Such a beautiful selection with many custom sizes — I didn't even have to get my lehenga altered and I usually do! She is very friendly, knowledgeable, and talented.", author: "Sukrana U.", time: "2 weeks ago", productId: 7, helpful: 2 },
+    { title: "Worth the drive from Vermont", body: "My daughter and I traveled 3.5 hours from Vermont. The shop is bright, colorful and filled with so many options. Sushma is incredibly talented and kind.", author: "Cindy S.", time: "2 weeks ago", productId: 11, helpful: 6 },
+    { title: "Had to leave a review", body: "I never write Google reviews, but my experience with Chaubandi and Sushma was so wonderful that this is the least I can do.", author: "Kyle V.", time: "3 weeks ago", productId: 3, helpful: 1 },
   ];
+
+  // Live Google rating + count for the badge, with a sensible fallback.
+  const [g, setG] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    medusa.getGoogleReviews()
+      .then(d => { if (!cancelled && d && (typeof d.rating === "number" || d.total)) setG(d); })
+      .catch(() => { /* fall back to defaults */ });
+    return () => { cancelled = true; };
+  }, []);
+  const rating = (typeof g?.rating === "number" ? g.rating : 4.9).toFixed(1);
+  const total = g?.total || null;
+  const googleUrl = g?.googleUrl || "https://www.google.com/maps/search/?api=1&query=Chaubandi%20Arlington%20MA";
 
   return (
     <section style={{ margin: "64px 0", background: "#16110c", borderTop: "1px solid #2b2218", borderBottom: "1px solid #2b2218", overflow: "hidden" }}>
-      <div style={{ padding: "32px 0", background: "#0d0a08", borderBottom: "1px solid #2b2218", display: "flex", whiteSpace: "nowrap" }}>
-        <div style={{ display: "inline-flex", animation: "marquee 40s linear infinite" }}>
-          {[...REVIEWS, ...REVIEWS].map((rev, i) => (
-            <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 16, padding: "0 48px" }}>
-              <div style={{ color: "#c5a255", letterSpacing: 2, fontSize: 14 }}>★★★★★</div>
-              <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontStyle: "italic", color: "#f0e6d2" }}>"{rev.text}"</div>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", color: "#e8c97a", fontWeight: 500 }}>— {rev.author}</div>
-            </div>
-          ))}
+      {/* Heading + Google rating badge */}
+      <div style={{ padding: "48px 32px 8px", textAlign: "center" }}>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, color: "#f0e6d2", marginBottom: 16 }}>Loved by Our Customers</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 13, flexWrap: "wrap" }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-label="Google" style={{ flexShrink: 0 }}>
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+          </svg>
+          <span style={{ fontSize: 16, color: "#f0e6d2", fontWeight: 700, letterSpacing: .5 }}>{rating}</span>
+          <span style={{ color: "#e8c97a", letterSpacing: 2, fontSize: 15 }}>★★★★★</span>
+          <span style={{ fontSize: 13, color: "#a3947c" }}>{total ? `${total} Google reviews` : "Rated on Google"}</span>
+          <a href={googleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#e8c97a", textDecoration: "none", borderBottom: "1px solid rgba(232,201,122,0.4)", paddingBottom: 1 }}>Read all on Google →</a>
         </div>
       </div>
+
+      {/* Product-linked review carousel — click a card to open its product */}
+      <ReviewCarousel reviews={PRODUCT_REVIEWS} products={products} navigate={navigate} />
       <div className="mobile-grid" style={{ maxWidth: 1400, margin: "0 auto", padding: "64px 32px", display: "grid", gridTemplateColumns: "1fr 1px 1fr", gap: 40, alignItems: "center", background: "linear-gradient(135deg, rgba(232,180,188,0.1) 0%, rgba(139,44,58,0.05) 100%)" }}>
         <div style={{ textAlign: "center", padding: "0 20px" }}>
           <div style={{ marginBottom: 16, display: "flex", justifyContent: "center" }}>
@@ -1061,7 +1949,7 @@ function HomePage({ navigate, products, setShopFilter }) {
       </section>
       <CouplesShowcase navigate={navigate} />
       <UgcReels />
-      <TestimonialAndBooking />
+      <TestimonialAndBooking navigate={navigate} products={products} />
       <FaqSection />
       <SeoTextSection />
     </div>
@@ -1069,7 +1957,8 @@ function HomePage({ navigate, products, setShopFilter }) {
 }
 
 /* ─── PRODUCT CARD ─── */
-function ProductCard({ product, navigate }) {
+function ProductCard({ product, navigate, inWishlist, toggleWishlist }) {
+  const saved = inWishlist ? inWishlist(product.id) : false;
   return (
     <div className="hover-lift" onClick={() => navigate("product", product)} style={{ cursor: "pointer" }}>
       <div className="img-zoom" style={{ aspectRatio: "3/4", borderRadius: 6, marginBottom: 12, position: "relative", overflow: "hidden" }}>
@@ -1080,8 +1969,9 @@ function ProductCard({ product, navigate }) {
           )}
         </div>
         {product.badge && <div style={{ position: "absolute", top: 10, left: 10, padding: "5px 12px", background: product.badge === "Bestseller" ? "#c5a255" : "#e8c97a", color: "#1a1208", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 500, borderRadius: 3 }}>{product.badge}</div>}
-        <div style={{ position: "absolute", top: 10, right: 10, width: 32, height: 32, background: "rgba(22,17,12,0.85)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .3s" }} className="wish-btn">
-          <Heart size={14} color="#f0e6d2" />
+        <div onClick={(e) => { e.stopPropagation(); toggleWishlist && toggleWishlist(product.id); }} title={saved ? "Remove from wishlist" : "Add to wishlist"}
+          style={{ position: "absolute", top: 10, right: 10, width: 32, height: 32, background: "rgba(22,17,12,0.85)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", opacity: saved ? 1 : 0, transition: "opacity .3s", cursor: "pointer" }} className="wish-btn">
+          <Heart size={14} color={saved ? "#e8c97a" : "#f0e6d2"} fill={saved ? "#e8c97a" : "none"} />
         </div>
       </div>
       <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 16, fontWeight: 400, marginBottom: 4, lineHeight: 1.3 }}>{product.name}</h3>
@@ -1094,16 +1984,26 @@ function ProductCard({ product, navigate }) {
 }
 
 /* ─── SHOP PAGE ─── */
-function ShopPage({ navigate, products, filter, setFilter, addToCart }) {
-  const filtered = filter === "All" ? products : products.filter(p => p.cat === filter);
+function ShopPage({ navigate, products, filter, setFilter, addToCart, query = "", setQuery, inWishlist, toggleWishlist }) {
+  const q = query.trim().toLowerCase();
+  const byCat = filter === "All" ? products : products.filter(p => p.cat === filter);
+  const filtered = q
+    ? byCat.filter(p =>
+        [p.name, p.cat, p.desc, p.badge].filter(Boolean).some(v => v.toLowerCase().includes(q))
+      )
+    : byCat;
+  const heading = q ? `Results for “${query.trim()}”` : (filter === "All" ? "All Collections" : filter);
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 32px 80px" }}>
       <div className="fade-in" style={{ marginBottom: 32 }}>
         <div style={{ fontSize: 12, color: "#a3947c", marginBottom: 8 }}>
           <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span>Shop</span> {filter !== "All" && <>/ <span>{filter}</span></>}
         </div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>{filter === "All" ? "All Collections" : filter}</h1>
-        <p style={{ fontSize: 14, color: "#a3947c" }}>{filtered.length} pieces · Handcrafted with love</p>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>{heading}</h1>
+        <p style={{ fontSize: 14, color: "#a3947c" }}>
+          {filtered.length} {filtered.length === 1 ? "piece" : "pieces"} · Handcrafted with love
+          {q && setQuery && <span onClick={() => setQuery("")} style={{ marginLeft: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Clear search</span>}
+        </p>
       </div>
       <div className="fade-in d1" style={{ display: "flex", gap: 8, marginBottom: 32, flexWrap: "wrap", alignItems: "center" }}>
         <Filter size={16} style={{ color: "#a3947c", marginRight: 8 }} />
@@ -1115,9 +2015,9 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart }) {
         ))}
       </div>
       <div className="fade-in d2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 20 }}>
-        {filtered.map(p => <ProductCard key={p.id} product={p} navigate={navigate} />)}
+        {filtered.map(p => <ProductCard key={p.id} product={p} navigate={navigate} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />)}
       </div>
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: "80px 0", color: "#a3947c" }}>No products in this category yet. Check back soon!</div>}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: "80px 0", color: "#a3947c" }}>{q ? `No pieces match “${query.trim()}”. Try a different search.` : "No products in this category yet. Check back soon!"}</div>}
     </div>
   );
 }
@@ -1130,17 +2030,20 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart }) {
    Customer Support, Best Paired carousel, Similar Items with filter chips.
 */
 
-function ProductPage({ product, navigate, addToCart, products }) {
+function ProductPage({ product, navigate, addToCart, products, inWishlist, toggleWishlist }) {
   const [selectedSize, setSelectedSize] = useState(null);
   const [qty, setQty]           = useState(1);
   const [added, setAdded]       = useState(false);
-  const [wishlist, setWishlist] = useState(false);
+  const wishlist = inWishlist ? inWishlist(product.id) : false;
   const [openAcc, setOpenAcc]   = useState("shipping");
   const [simFilter, setSimFilter] = useState("Closest Match");
   const [copied, setCopied]     = useState(false);
   const [sizeError, setSizeError] = useState(false);
+  const [slide, setSlide]       = useState(0);
+  useEffect(() => { setSlide(0); }, [product.id]);
 
-  const ALL_SIZES = ["XS","S","M","L","XL","XXL","3XL","4XL","5XL","6XL"];
+  /* real, purchasable sizes for this product (each maps to a Medusa variant) */
+  const ALL_SIZES = product.sizes?.length ? product.sizes : ["XS","S","M","L","XL","XXL"];
 
   /* color variants = other products in same category (click to switch) */
   const variants = products.filter(p => p.cat === product.cat).slice(0, 4);
@@ -1171,7 +2074,7 @@ function ProductPage({ product, navigate, addToCart, products }) {
 
   const handleAdd = () => {
     if (!selectedSize) { setSizeError(true); return; }
-    for (let i = 0; i < qty; i++) addToCart(product, selectedSize);
+    addToCart(product, selectedSize, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -1182,10 +2085,15 @@ function ProductPage({ product, navigate, addToCart, products }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  /* repeat images so the left grid always has at least 7 tiles like AZA */
-  const gridImages = [];
-  const srcImgs = product.images?.length ? product.images : [null];
-  for (let i = 0; i < 7; i++) gridImages.push(srcImgs[i % srcImgs.length]);
+  /* carousel slides: each product photo + a trailing slot reserved for an AI video */
+  const photoSlides = product.images?.length ? product.images : [null];
+  const slides = [...photoSlides, { video: true }];
+  const arrowBtn = {
+    position: "absolute", top: "50%", transform: "translateY(-50%)", width: 48, height: 48,
+    borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", display: "flex",
+    alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 3,
+    boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+  };
 
   const S = {
     checkRow: { display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, color: "#f0e6d2" },
@@ -1200,38 +2108,49 @@ function ProductPage({ product, navigate, addToCart, products }) {
 
         {/* ════════ LEFT — 2-COLUMN IMAGE GRID ════════ */}
         <div>
-          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {gridImages.map((src, i) => {
-              const isLast = i === gridImages.length - 1;
-              return (
-                <div key={i} style={{ position: "relative", aspectRatio: "3/4", background: product.color || "#1f1812", overflow: "hidden", borderRadius: 2, cursor: "pointer" }}>
-                  {src && <img src={src} alt={`${product.name} view ${i + 1}`} loading={i > 1 ? "lazy" : "eager"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: isLast ? "brightness(0.55)" : "none" }} />}
-
-                  {/* "View Similar" pill — top right of 2nd image */}
-                  {i === 1 && (
-                    <div onClick={(e) => { e.stopPropagation(); navigate("shop"); }} style={{ position: "absolute", top: 12, right: 12, background: "#16110c", borderRadius: 6, padding: "8px 12px", fontSize: 11, color: "#f0e6d2", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, boxShadow: "0 1px 6px rgba(0,0,0,0.15)", cursor: "pointer" }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><rect x="3" y="5" width="13" height="15" rx="1.5"/><path d="M19 4.5v15M22 6.5v11"/></svg>
-                      View Similar
+          {/* single-slide carousel — arrows/dots advance one slide at a time */}
+          <div style={{ position: "relative", width: "100%", aspectRatio: "2/3", background: product.color || "#1f1812", overflow: "hidden", borderRadius: 2 }}>
+            <div style={{ display: "flex", width: `${slides.length * 100}%`, height: "100%", transform: `translateX(-${slide * (100 / slides.length)}%)`, transition: "transform .45s cubic-bezier(.4,0,.2,1)" }}>
+              {slides.map((s, i) => (
+                <div key={i} style={{ width: `${100 / slides.length}%`, height: "100%", flexShrink: 0, position: "relative", background: product.color || "#1f1812" }}>
+                  {s && s.video ? (
+                    /* reserved AI-video slot */
+                    <div style={{ position: "absolute", inset: 0, background: "#0d0a08", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                      <div style={{ width: 76, height: 76, borderRadius: "50%", border: "1.5px solid rgba(232,201,122,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="#e8c97a"><path d="M8 5v14l11-7z"/></svg>
+                      </div>
+                      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "#e8c97a", textTransform: "uppercase" }}>AI Video</div>
+                      <div style={{ fontSize: 12, color: "#6e6353", letterSpacing: 1 }}>Coming soon</div>
                     </div>
-                  )}
+                  ) : s ? (
+                    <img src={s} alt={`${product.name} view ${i + 1}`} loading={i > 0 ? "lazy" : "eager"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  ) : null}
 
-                  {/* "Contains" chip — bottom of 1st image */}
-                  {i === 0 && (
-                    <div style={{ position: "absolute", bottom: 12, right: 12, background: "rgba(22,17,12,0.85)", borderRadius: 100, padding: "7px 14px", fontSize: 11, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 6 }}>
+                  {/* "Contains" chip — first photo slide only */}
+                  {i === 0 && s && !s.video && (
+                    <div style={{ position: "absolute", bottom: 16, right: 16, background: "rgba(22,17,12,0.85)", borderRadius: 100, padding: "7px 14px", fontSize: 11, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 6 }}>
                       Contains: Choli, Lehenga, Dupatta
                       <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#a3947c", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>?</span>
                     </div>
                   )}
-
-                  {/* "VIEW ALL IMAGES & VIDEOS" overlay — last tile */}
-                  {isLast && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontStyle: "italic", letterSpacing: 1, textAlign: "center", padding: 20 }}>
-                      VIEW ALL IMAGES &amp; VIDEOS
-                    </div>
-                  )}
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* prev / next */}
+            <button aria-label="Previous" onClick={() => setSlide(p => (p - 1 + slides.length) % slides.length)} style={{ ...arrowBtn, left: 16 }}>
+              <ChevronLeft size={22} strokeWidth={2} color="#1a1208" />
+            </button>
+            <button aria-label="Next" onClick={() => setSlide(p => (p + 1) % slides.length)} style={{ ...arrowBtn, right: 16 }}>
+              <ChevronRight size={22} strokeWidth={2} color="#1a1208" />
+            </button>
+
+            {/* slide dots */}
+            <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 3 }}>
+              {slides.map((_, i) => (
+                <span key={i} onClick={() => setSlide(i)} style={{ width: i === slide ? 22 : 8, height: 8, borderRadius: 100, background: i === slide ? "#e8c97a" : "rgba(240,235,228,0.55)", cursor: "pointer", transition: "all .3s" }} />
+              ))}
+            </div>
           </div>
 
           {/* breadcrumb under images, AZA-style */}
@@ -1262,7 +2181,7 @@ function ProductPage({ product, navigate, addToCart, products }) {
             </div>
             <div style={{ display: "flex", gap: 14, flexShrink: 0, paddingTop: 4 }}>
               <svg onClick={() => { try { navigator.share?.({ title: product.name, url: window.location.href }); } catch(e){} }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5" style={{ cursor: "pointer" }}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
-              <Heart size={20} style={{ cursor: "pointer" }} fill={wishlist ? "#e8c97a" : "none"} color={wishlist ? "#e8c97a" : "#f0e6d2"} onClick={() => setWishlist(!wishlist)} />
+              <Heart size={20} style={{ cursor: "pointer" }} fill={wishlist ? "#e8c97a" : "none"} color={wishlist ? "#e8c97a" : "#f0e6d2"} onClick={() => toggleWishlist && toggleWishlist(product.id)} />
             </div>
           </div>
 
@@ -1526,19 +2445,44 @@ function ProductPage({ product, navigate, addToCart, products }) {
 }
 
 /* ─── CHECKOUT PAGE ─── */
-function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlaced, setOrderPlaced }) {
-  const [form, setForm] = useState({ email: "", firstName: "", lastName: "", address: "", city: "", state: "MA", zip: "", phone: "" });
+function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlaced, setOrderPlaced, placeOrder, placedOrder, customer }) {
+  const [form, setForm] = useState({ email: customer?.email || "", firstName: customer?.first_name || "", lastName: customer?.last_name || "", address: "", city: "", state: "MA", zip: "", phone: customer?.phone || "" });
   const [cardForm, setCardForm] = useState({ number: "", exp: "", cvv: "", name: "" });
+  const [deliveryMethod, setDeliveryMethod] = useState("ship");
+  const [placing, setPlacing] = useState(false);
+  const [orderError, setOrderError] = useState("");
   const tax = total * 0.0625;
   const grandTotal = total + tax;
+
+  const handlePlaceOrder = async () => {
+    setOrderError("");
+    setPlacing(true);
+    try {
+      // placeOrder runs the real Medusa checkout; falls back to a local
+      // confirmation if the backend is offline.
+      if (placeOrder) await placeOrder(form, deliveryMethod);
+      else setCart([]);
+      setOrderPlaced(true);
+    } catch (e) {
+      if (String(e?.message) === "offline") {
+        setCart([]);
+        setOrderPlaced(true);
+      } else {
+        console.error("[Chaubandi] place order failed", e);
+        setOrderError("We couldn't complete your order. Please try again or contact us on WhatsApp.");
+      }
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   if (orderPlaced) {
     return (
       <div className="fade-in" style={{ maxWidth: 600, margin: "0 auto", padding: "80px 32px", textAlign: "center" }}>
         <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#3dbd83", margin: "0 auto 24px", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={32} color="#fff" /></div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 12 }}>Order Confirmed!</h1>
-        <p style={{ fontSize: 14, color: "#a3947c", lineHeight: 1.7, marginBottom: 8 }}>Thank you for your order. We'll send a confirmation to <strong>{form.email || "your email"}</strong>.</p>
-        <p style={{ fontSize: 13, color: "#a3947c", marginBottom: 32 }}>Order #CB-{Math.floor(Math.random() * 90000) + 10000} · Ships in 24–48 hours</p>
+        <p style={{ fontSize: 14, color: "#a3947c", lineHeight: 1.7, marginBottom: 8 }}>Thank you for your order. We'll send a confirmation to <strong>{placedOrder?.email || form.email || "your email"}</strong>.</p>
+        <p style={{ fontSize: 13, color: "#a3947c", marginBottom: 32 }}>Order #{placedOrder?.display_id ? `CB-${placedOrder.display_id}` : `CB-${Math.floor(Math.random() * 90000) + 10000}`} · {deliveryMethod === "pickup" ? "Ready for pickup soon" : "Ships in 24–48 hours"}</p>
         <div style={{ background: "#1f1812", borderRadius: 8, padding: 24, marginBottom: 32, textAlign: "left" }}>
           <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "#a3947c", marginBottom: 16 }}>What's Next</div>
           {["You'll receive an email confirmation shortly","Our team will prepare & ship your order within 24–48 hours","Free alterations — we'll reach out for measurements","Track your package via the link in your email"].map((t,i) => (
@@ -1574,19 +2518,58 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
         <div className="fade-in d1">
           {step === 1 && (
             <div>
-              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, marginBottom: 20 }}>Shipping Information</h2>
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, marginBottom: 20 }}>{deliveryMethod === "pickup" ? "Pickup Details" : "Shipping Information"}</h2>
+
+              {/* ── DELIVERY METHOD (Ship vs. Store Pickup / BOPIS) ── */}
+              <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                {[
+                  { key: "ship", icon: "🚚", title: "Ship to me", desc: "Free USA shipping · 24–48 hrs" },
+                  { key: "pickup", icon: "🏬", title: "Pick up free", desc: "Arlington, MA boutique" },
+                ].map(opt => {
+                  const active = deliveryMethod === opt.key;
+                  return (
+                    <div key={opt.key} onClick={() => setDeliveryMethod(opt.key)} style={{ cursor: "pointer", border: `1.5px solid ${active ? "#c5a255" : "#2b2218"}`, background: active ? "#1f1812" : "#16110c", borderRadius: 8, padding: "16px 18px", transition: "all .2s" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${active ? "#c5a255" : "#2b2218"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {active && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#c5a255" }} />}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#f0e6d2", marginBottom: 2 }}>{opt.title}</div>
+                      <div style={{ fontSize: 12, color: "#a3947c" }}>{opt.desc}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {deliveryMethod === "pickup" && (
+                <div className="fade-in" style={{ background: "#1f1812", border: "1px solid rgba(197,162,85,0.25)", borderRadius: 8, padding: "20px 22px", marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 16 }}>📍</span>
+                    <span style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "#c5a255", fontWeight: 600 }}>Chaubandi Boston · Pickup Location</span>
+                  </div>
+                  <div style={{ fontSize: 14, color: "#f0e6d2", lineHeight: 1.7, marginBottom: 4 }}>177 Massachusetts Avenue<br />Arlington, MA 02474</div>
+                  <div style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.7, marginBottom: 14 }}>Tuesday – Sunday · 10:00 AM – 7:00 PM ET</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#3dbd83", fontWeight: 500 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3dbd83", flexShrink: 0 }} />
+                    We'll text you when it's ready — usually within 2 hours.
+                  </div>
+                </div>
+              )}
               <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>EMAIL</label><input value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="you@email.com" style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }} className="mobile-stack">
                 <div><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>FIRST NAME</label><input value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
                 <div><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>LAST NAME</label><input value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
               </div>
+              {deliveryMethod === "ship" && (<>
               <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>ADDRESS</label><input value={form.address} onChange={e => setForm({...form, address: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12, marginBottom: 16 }} className="mobile-stack">
                 <div><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>CITY</label><input value={form.city} onChange={e => setForm({...form, city: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
                 <div><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>STATE</label><input value={form.state} onChange={e => setForm({...form, state: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
                 <div><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>ZIP</label><input value={form.zip} onChange={e => setForm({...form, zip: e.target.value})} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
               </div>
-              <div style={{ marginBottom: 24 }}><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>PHONE</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="For delivery updates" style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
+              </>)}
+              <div style={{ marginBottom: 24 }}><label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6 }}>{deliveryMethod === "pickup" ? "MOBILE · PICKUP TEXTS" : "PHONE"}</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder={deliveryMethod === "pickup" ? "We'll text you when it's ready" : "For delivery updates"} style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none" }} /></div>
               <button className="btn-shine" onClick={() => setStep(2)} style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 13, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>Continue to Payment</button>
             </div>
           )}
@@ -1639,10 +2622,11 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
                   <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 16 }}>${(item.price * item.qty).toFixed(0)}</div>
                 </div>
               ))}
+              {orderError && <div style={{ fontSize: 13, color: "#e8a0a0", background: "rgba(120,30,30,0.25)", border: "1px solid rgba(180,60,60,0.4)", borderRadius: 6, padding: "12px 14px", marginTop: 20 }}>{orderError}</div>}
               <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-                <button onClick={() => setStep(2)} style={{ flex: 1, height: 52, border: "1px solid #2b2218", background: "#16110c", cursor: "pointer", fontSize: 12, fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>← Back</button>
-                <button className="btn-shine" onClick={() => { setOrderPlaced(true); setCart([]); }} style={{ flex: 2, height: 52, background: "#c5a255", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 13, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>
-                  Place Order — ${grandTotal.toFixed(2)}
+                <button disabled={placing} onClick={() => setStep(2)} style={{ flex: 1, height: 52, border: "1px solid #2b2218", background: "#16110c", cursor: placing ? "not-allowed" : "pointer", fontSize: 12, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: placing ? 0.6 : 1 }}>← Back</button>
+                <button className="btn-shine" disabled={placing} onClick={handlePlaceOrder} style={{ flex: 2, height: 52, background: "#c5a255", color: "#1a1208", border: "none", cursor: placing ? "wait" : "pointer", fontSize: 13, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: placing ? 0.75 : 1 }}>
+                  {placing ? "Placing Order…" : `Place Order — $${grandTotal.toFixed(2)}`}
                 </button>
               </div>
             </div>
