@@ -553,204 +553,145 @@ export default function App() {
 }
 
 /* ─── TRACK ORDER (public — order # + email) ─── */
-function TrackOrderPage({ navigate, customer }) {
-  const [form, setForm] = useState({ orderNo: "", email: customer?.email || "" });
-  const [result, setResult] = useState(null); // { found, order? }
-  const [busy, setBusy] = useState(false);
-
-  const lookup = async () => {
-    const num = form.orderNo.replace(/^cb-?/i, "").trim();
-    const email = form.email.trim().toLowerCase();
-    if (!num || !email) return;
-    setBusy(true);
-    let order = null;
-    // Logged-in: check real Medusa orders first.
-    if (customer) {
-      try {
-        const list = await medusa.listCustomerOrders();
-        order = list.find(o => String(o.display_id) === num && (o.email || "").toLowerCase() === email);
-        if (order) order = { display_id: order.display_id, created_at: order.created_at, items: (order.items || []).map(i => ({ title: i.product_title || i.title, qty: i.quantity })) };
-      } catch { /* fall through to local */ }
-    }
-    if (!order) {
-      try {
-        const list = JSON.parse(localStorage.getItem("cb_orders") || "[]");
-        order = list.find(o => String(o.display_id) === num && o.email === email);
-      } catch { /* ignore */ }
-    }
-    setResult({ found: !!order, order });
-    setBusy(false);
-  };
-
-  const STAGES = ["Order Confirmed", "Being Prepared", "Shipped", "Delivered"];
-  const stageOf = (o) => {
-    const days = (Date.now() - new Date(o.created_at).getTime()) / 86400000;
-    return days < 1 ? 0 : days < 3 ? 1 : days < 6 ? 2 : 3;
-  };
-
-  const field = { width: "100%", height: 48, border: "1px solid #2b2218", borderRadius: 6, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" };
-
-  return (
-    <div style={{ maxWidth: 560, margin: "0 auto", padding: "64px 32px 90px" }}>
-      <div className="fade-in" style={{ textAlign: "center", marginBottom: 30 }}>
-        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12 }}>Where's My Order?</div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 38, fontWeight: 300 }}>Track Your Order</h1>
-        <p style={{ fontSize: 13.5, color: "#a3947c", marginTop: 10, lineHeight: 1.7 }}>Enter your order number (from your confirmation) and the email you used at checkout.</p>
-      </div>
-      <div className="fade-in d1" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 26 }}>
-        <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#a3947c", display: "block", marginBottom: 7 }}>Order Number</label>
-        <input value={form.orderNo} onChange={e => setForm({ ...form, orderNo: e.target.value })} placeholder="e.g. CB-1024" style={{ ...field, marginBottom: 14 }} />
-        <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#a3947c", display: "block", marginBottom: 7 }}>Email</label>
-        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} onKeyDown={e => { if (e.key === "Enter") lookup(); }} placeholder="you@example.com" style={{ ...field, marginBottom: 18 }} />
-        <button onClick={lookup} disabled={busy} className="btn-shine" style={{ width: "100%", height: 50, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: busy ? "wait" : "pointer", fontFamily: "'Outfit',sans-serif" }}>{busy ? "Looking up…" : "Track Order"}</button>
-      </div>
-
-      {result && !result.found && (
-        <div className="fade-in" style={{ marginTop: 22, padding: "18px 20px", background: "rgba(120,30,30,0.18)", border: "1px solid rgba(180,60,60,0.35)", borderRadius: 8, fontSize: 13.5, color: "#e8c0c0", lineHeight: 1.7 }}>
-          We couldn't find that order. Double-check the number and email, or message us on <span onClick={() => window.open("https://wa.me/18578001282?text=Hi!%20I'd%20like%20to%20check%20on%20my%20order.", "_blank")} style={{ color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>WhatsApp</span> and we'll find it for you.
-        </div>
-      )}
-
-      {result?.found && (() => {
-        const o = result.order;
-        const stage = stageOf(o);
-        return (
-          <div className="fade-in" style={{ marginTop: 22, background: "#16110c", border: "1px solid rgba(197,162,85,0.3)", borderRadius: 10, padding: 26 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#f0e6d2" }}>Order #CB-{o.display_id}</span>
-              <span style={{ fontSize: 12.5, color: "#a3947c" }}>{new Date(o.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
-            </div>
-            {STAGES.map((s, i) => (
-              <div key={s} style={{ display: "flex", gap: 14, alignItems: "flex-start", paddingBottom: i < STAGES.length - 1 ? 22 : 0, position: "relative" }}>
-                {i < STAGES.length - 1 && <span style={{ position: "absolute", left: 11, top: 24, bottom: 0, width: 2, background: i < stage ? "#3dbd83" : "#2b2218" }} />}
-                <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, background: i <= stage ? "#3dbd83" : "#2b2218", color: i <= stage ? "#fff" : "#6e6353", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>{i <= stage ? <Check size={13} /> : <span style={{ fontSize: 11 }}>{i + 1}</span>}</span>
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: i === stage ? 700 : 500, color: i <= stage ? "#f0e6d2" : "#6e6353" }}>{s}</div>
-                  {i === stage && <div style={{ fontSize: 12, color: "#a3947c", marginTop: 3 }}>{stage === 0 ? "We've received your order." : stage === 1 ? "Being carefully prepared & packed." : stage === 2 ? "On its way — tracking link in your email." : "Enjoy! Free alterations if you need them."}</div>}
-                </div>
-              </div>
-            ))}
-            {o.items?.length > 0 && <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #2b2218", fontSize: 13, color: "#a3947c" }}>{o.items.map(i => `${i.title} ×${i.qty}`).join("  •  ")}</div>}
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
-
-/* ─── FLOATING WIDGETS: chat bubble · reviews tab · 10%-off tab ─── */
+/* ─── FLOATING WIDGETS: chat bubble · reviews tab · 10% off tab ─── */
 function FloatingWidgets({ navigate }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSeen, setChatSeen] = useState(false);
-  const [thread, setThread] = useState([{ from: "bot", text: "Namaste! 🙏 I'm the Chaubandi assistant. What can I help you with?" }]);
   const [offerOpen, setOfferOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [offerState, setOfferState] = useState("form"); // form | done | error
-
-  const QUICK = [
-    { q: "Do you offer custom sizing?", a: "Yes! Every purchase includes free alterations, and most pieces can be made to your exact measurements at no extra charge. Try our Perfect Fit tool or visit the boutique." },
-    { q: "How long does shipping take?", a: "Free USA shipping — in-stock items ship in 24–48 hours and arrive in 3–5 business days. Custom pieces take 2–4 weeks." },
-    { q: "Can I book a styling session?", a: "Absolutely — free video consultations via WhatsApp or Zoom, or visit us in Arlington, MA (Tue–Sun, 10–7). Tap below to chat with Sushma directly." },
-    { q: "What's your return policy?", a: "Unworn items with tags can be returned within 14 days for a refund or exchange. Custom and bridal pieces are final sale — we confirm every detail before production." },
+  const [offerEmail, setOfferEmail] = useState("");
+  const [offerDone, setOfferDone] = useState(false);
+  const [answer, setAnswer] = useState(null);
+  const QA = [
+    ["What are your store hours?", "We're open Tuesday – Sunday, 10 AM – 7 PM ET at 177 Massachusetts Ave, Arlington, MA."],
+    ["Do you offer custom sizing?", "Yes! Every purchase includes free alterations, and made-to-measure is complimentary. Use the Perfect Fit tool to save your measurements."],
+    ["How long does shipping take?", "Free US shipping — in-stock pieces ship in 24–48 hours and arrive in 3–5 business days. Custom pieces take 2–4 weeks."],
+    ["Can I book a styling session?", "Absolutely — free video consultations with Sushma via WhatsApp or Zoom. Tap below to book."],
   ];
-
-  const ask = (item) => setThread(t => [...t, { from: "user", text: item.q }, { from: "bot", text: item.a }]);
-
   const goReviews = () => {
     navigate("home");
-    setTimeout(() => {
-      const h = [...document.querySelectorAll("h2")].find(e => /Loved by Our Customers/.test(e.textContent));
-      h?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 350);
+    setTimeout(() => document.getElementById("cb-reviews")?.scrollIntoView({ behavior: "smooth" }), 350);
   };
-
   const claimOffer = async () => {
-    if (!/\S+@\S+\.\S+/.test(email)) { setOfferState("error"); return; }
-    try {
-      const list = JSON.parse(localStorage.getItem("cb_newsletter") || "[]");
-      if (!list.includes(email)) list.push(email);
-      localStorage.setItem("cb_newsletter", JSON.stringify(list));
-    } catch { /* ignore */ }
-    try { await medusa.subscribeNewsletter(email); } catch { /* offline — code still shown */ }
-    setOfferState("done");
+    if (!/\S+@\S+\.\S+/.test(offerEmail)) return;
+    try { await medusa.subscribeNewsletter(offerEmail); } catch { /* offline ok */ }
+    setOfferDone(true);
   };
-
-  const tabBase = { position: "fixed", zIndex: 2500, background: "#2a1a3a", color: "#f0e6d2", border: "none", cursor: "pointer", fontFamily: "'Outfit',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,0.45)" };
-
+  const tabStyle = { position: "fixed", left: 0, background: "#2a1f2d", color: "#f0e6d2", zIndex: 2500, cursor: "pointer", fontFamily: "'Outfit',sans-serif", border: "none" };
   return (
     <>
-      {/* Reviews side tab (left edge) */}
-      <button onClick={goReviews} aria-label="Reviews" style={{ ...tabBase, left: 0, top: "58%", padding: "14px 8px", borderRadius: "0 8px 8px 0", writingMode: "vertical-rl", textOrientation: "mixed", fontSize: 12, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ color: "#e8c97a" }}>★</span> Reviews
-      </button>
-
-      {/* Get 10% Off tab (bottom-left) */}
-      <button onClick={() => { setOfferOpen(true); setOfferState("form"); }} aria-label="Get 10% off" style={{ ...tabBase, left: 14, bottom: 14, padding: "11px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5 }}>
-        Get 10% Off
-      </button>
-
-      {/* Chat bubble (bottom-right) */}
-      <button onClick={() => { setChatOpen(o => !o); setChatSeen(true); }} aria-label="Chat with us" style={{ ...tabBase, right: 18, bottom: 18, width: 58, height: 58, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.8"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-        {!chatSeen && <span style={{ position: "absolute", top: -2, right: -2, width: 20, height: 20, borderRadius: "50%", background: "#e0294a", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0d0a08" }}>1</span>}
-      </button>
-
-      {/* Chat panel */}
+      {/* reviews side tab */}
+      <button onClick={goReviews} style={{ ...tabStyle, top: "46%", padding: "13px 7px", borderRadius: "0 6px 6px 0", writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: 11.5, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6 }}>★ Reviews</button>
+      {/* 10% off tab */}
+      <button onClick={() => setOfferOpen(true)} style={{ ...tabStyle, bottom: 18, padding: "10px 14px", borderRadius: "0 6px 6px 0", fontSize: 12, fontWeight: 700 }}>Get 10% Off</button>
+      {/* chat bubble */}
+      <div onClick={() => { setChatOpen(!chatOpen); setChatSeen(true); }} style={{ position: "fixed", right: 20, bottom: 20, width: 54, height: 54, borderRadius: "50%", background: "#2a1f2d", border: "1px solid rgba(197,162,85,0.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 2500, boxShadow: "0 4px 18px rgba(0,0,0,0.45)" }}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e8c97a" strokeWidth="1.8"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        {!chatSeen && <span style={{ position: "absolute", top: -3, right: -3, width: 18, height: 18, borderRadius: "50%", background: "#d4466a", color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>1</span>}
+      </div>
+      {/* chat panel */}
       {chatOpen && (
-        <div style={{ position: "fixed", right: 18, bottom: 86, width: 340, maxWidth: "calc(100vw - 36px)", maxHeight: "62vh", background: "#16110c", border: "1px solid #2b2218", borderRadius: 14, zIndex: 2501, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 48px rgba(0,0,0,0.6)" }}>
-          <div style={{ background: "#2a1a3a", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#f0e6d2" }}>Chaubandi Assistant</div>
-              <div style={{ fontSize: 11, color: "#3dbd83", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3dbd83" }} /> Online — replies instantly</div>
-            </div>
-            <X size={18} style={{ cursor: "pointer", color: "#f0e6d2" }} onClick={() => setChatOpen(false)} />
+        <div style={{ position: "fixed", right: 20, bottom: 84, width: 330, maxWidth: "88vw", background: "#16110c", border: "1px solid #2b2218", borderRadius: 12, zIndex: 2501, overflow: "hidden", boxShadow: "0 10px 40px rgba(0,0,0,0.55)" }}>
+          <div style={{ background: "#2a1f2d", padding: "15px 18px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f0e6d2" }}>Chaubandi Concierge</div>
+            <div style={{ fontSize: 11.5, color: "#3dbd83" }}>● Sushma typically replies within minutes</div>
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-            {thread.map((m, i) => (
-              <div key={i} style={{ alignSelf: m.from === "user" ? "flex-end" : "flex-start", maxWidth: "85%", background: m.from === "user" ? "#c5a255" : "#241c14", color: m.from === "user" ? "#1a1208" : "#f0e6d2", borderRadius: m.from === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px", padding: "10px 13px", fontSize: 13, lineHeight: 1.55 }}>{m.text}</div>
-            ))}
-          </div>
-          <div style={{ padding: "10px 14px 14px", borderTop: "1px solid #2b2218" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
-              {QUICK.map((item) => (
-                <button key={item.q} onClick={() => ask(item)} style={{ padding: "7px 11px", background: "transparent", border: "1px solid rgba(197,162,85,0.45)", color: "#e8c97a", borderRadius: 100, fontSize: 11.5, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>{item.q}</button>
+          <div style={{ padding: 16, maxHeight: 320, overflowY: "auto" }}>
+            {answer === null ? <>
+              <div style={{ fontSize: 12.5, color: "#a3947c", marginBottom: 12 }}>Namaste! 🙏 How can we help?</div>
+              {QA.map(([q], i) => (
+                <button key={i} onClick={() => setAnswer(i)} style={{ display: "block", width: "100%", textAlign: "left", background: "#1f1812", border: "1px solid #2b2218", color: "#f0e6d2", borderRadius: 8, padding: "10px 13px", fontSize: 12.5, cursor: "pointer", marginBottom: 8, fontFamily: "'Outfit',sans-serif" }}>{q}</button>
               ))}
-            </div>
-            <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20have%20a%20question.", "_blank")} style={{ width: "100%", height: 42, background: "#25D366", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: 0.5, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
-              💬 Chat with Sushma on WhatsApp
-            </button>
+            </> : <>
+              <div style={{ fontSize: 12.5, color: "#e8c97a", marginBottom: 8 }}>{QA[answer][0]}</div>
+              <div style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.7, marginBottom: 14 }}>{QA[answer][1]}</div>
+              <button onClick={() => setAnswer(null)} style={{ background: "none", border: "none", color: "#e8c97a", fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0, fontFamily: "'Outfit',sans-serif" }}>← More questions</button>
+            </>}
+          </div>
+          <div style={{ padding: "0 16px 16px" }}>
+            <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!", "_blank")} style={{ width: "100%", height: 44, background: "#25D366", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Chat with Sushma on WhatsApp</button>
           </div>
         </div>
       )}
-
       {/* 10% off modal */}
-      {offerOpen && (
-        <>
-          <div onClick={() => setOfferOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2502 }} />
-          <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 400, maxWidth: "calc(100vw - 40px)", background: "#16110c", border: "1px solid rgba(197,162,85,0.35)", borderRadius: 14, zIndex: 2503, padding: "34px 30px", textAlign: "center" }}>
-            <X size={18} style={{ position: "absolute", top: 14, right: 14, cursor: "pointer", color: "#a3947c" }} onClick={() => setOfferOpen(false)} />
-            {offerState === "done" ? (
-              <>
-                <div style={{ fontSize: 34, marginBottom: 10 }}>🎉</div>
-                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, color: "#f0e6d2", marginBottom: 10 }}>You're in!</h3>
-                <p style={{ fontSize: 13.5, color: "#a3947c", marginBottom: 18 }}>Use this code at checkout for 10% off your first order:</p>
-                <div style={{ display: "inline-block", padding: "12px 28px", border: "1.5px dashed #c5a255", borderRadius: 8, fontSize: 20, letterSpacing: 3, color: "#e8c97a", fontWeight: 700, marginBottom: 8 }}>WELCOME10</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Welcome Offer</div>
-                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: "#f0e6d2", marginBottom: 8 }}>Get 10% Off Your First Order</h3>
-                <p style={{ fontSize: 13.5, color: "#a3947c", marginBottom: 20 }}>Join our list for new arrivals, bridal drops & exclusive offers.</p>
-                <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (offerState === "error") setOfferState("form"); }} onKeyDown={e => { if (e.key === "Enter") claimOffer(); }} placeholder="you@example.com"
-                  style={{ width: "100%", height: 46, border: `1px solid ${offerState === "error" ? "#d9534f" : "#2b2218"}`, borderRadius: 6, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#0d0a08", color: "#f0e6d2", marginBottom: 12 }} />
-                {offerState === "error" && <div style={{ fontSize: 12, color: "#e8a0a0", marginBottom: 10 }}>Please enter a valid email.</div>}
-                <button onClick={claimOffer} className="btn-shine" style={{ width: "100%", height: 48, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Claim My 10% Off</button>
-              </>
-            )}
-          </div>
-        </>
-      )}
+      {offerOpen && <>
+        <div onClick={() => setOfferOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2502 }} />
+        <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 400, maxWidth: "90vw", background: "#16110c", border: "1px solid rgba(197,162,85,0.35)", borderRadius: 14, zIndex: 2503, padding: 30, textAlign: "center" }}>
+          <X size={18} onClick={() => setOfferOpen(false)} style={{ position: "absolute", top: 16, right: 16, cursor: "pointer", color: "#a3947c" }} />
+          {offerDone ? <>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>🎉</div>
+            <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, color: "#f0e6d2", marginBottom: 10 }}>Here's your code</h3>
+            <div style={{ fontSize: 22, letterSpacing: 3, color: "#e8c97a", fontWeight: 700, border: "1px dashed rgba(197,162,85,0.5)", borderRadius: 8, padding: "12px 0", marginBottom: 12 }}>WELCOME10</div>
+            <p style={{ fontSize: 12.5, color: "#a3947c" }}>Apply it at checkout for 10% off your first order.</p>
+          </> : <>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Join Chaubandi & Save</div>
+            <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: "#f0e6d2", marginBottom: 8 }}>Get 10% Off Your First Order</h3>
+            <p style={{ fontSize: 13, color: "#a3947c", marginBottom: 18 }}>Plus first access to new arrivals & bridal drops.</p>
+            <input value={offerEmail} onChange={e => setOfferEmail(e.target.value)} onKeyDown={e => { if (e.key === "Enter") claimOffer(); }} placeholder="your@email.com"
+              style={{ width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 6, padding: "0 14px", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", fontFamily: "'Outfit',sans-serif", marginBottom: 10 }} />
+            <button onClick={claimOffer} style={{ width: "100%", height: 46, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Claim My 10% Off</button>
+          </>}
+        </div>
+      </>}
     </>
+  );
+}
+
+/* ─── ORDER TRACKING PAGE ─── */
+function TrackOrderPage({ navigate, customer }) {
+  const [form, setForm] = useState({ order: "", email: "" });
+  const [result, setResult] = useState(null); // "found" | "pending"
+  const [order, setOrder] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const STAGES = ["Order Placed", "Processing", "Shipped", "Delivered"];
+  const stageOf = (o) => o?.fulfillment_status === "delivered" ? 3 : o?.fulfillment_status === "shipped" ? 2 : 1;
+  const track = async () => {
+    if (!form.order.trim() || !/\S+@\S+\.\S+/.test(form.email)) return;
+    setBusy(true);
+    try {
+      const num = form.order.replace(/\D/g, "");
+      const orders = customer ? await medusa.listCustomerOrders() : [];
+      const hit = orders.find(o => String(o.display_id) === num && (o.email || "").toLowerCase() === form.email.trim().toLowerCase());
+      if (hit) { setOrder(hit); setResult("found"); } else setResult("pending");
+    } catch { setResult("pending"); }
+    setBusy(false);
+  };
+  const field = { width: "100%", height: 48, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" };
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "64px 32px 90px" }}>
+      <div className="fade-in" style={{ textAlign: "center", marginBottom: 30 }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12 }}>Order Status</div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 38, fontWeight: 300 }}>Track Your Order</h1>
+        <p style={{ fontSize: 13.5, color: "#a3947c", marginTop: 10 }}>Enter your order number (e.g. CB-1024) and the email used at checkout.</p>
+      </div>
+      <div className="fade-in d1" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 26 }}>
+        <label style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", display: "block", marginBottom: 6, textTransform: "uppercase" }}>Order Number</label>
+        <input value={form.order} onChange={e => setForm({ ...form, order: e.target.value })} placeholder="CB-1024" style={{ ...field, marginBottom: 16 }} />
+        <label style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", display: "block", marginBottom: 6, textTransform: "uppercase" }}>Email</label>
+        <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} onKeyDown={e => { if (e.key === "Enter") track(); }} placeholder="you@email.com" style={{ ...field, marginBottom: 18 }} />
+        <button onClick={track} disabled={busy} style={{ width: "100%", height: 50, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: busy ? "wait" : "pointer", fontFamily: "'Outfit',sans-serif" }}>{busy ? "Checking…" : "Track Order"}</button>
+      </div>
+      {result === "found" && order && (
+        <div className="fade-in" style={{ marginTop: 22, background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 24 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f0e6d2", marginBottom: 4 }}>Order #CB-{order.display_id}</div>
+          <div style={{ fontSize: 12.5, color: "#a3947c", marginBottom: 18 }}>{new Date(order.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} · {(order.items || []).reduce((s, i) => s + i.quantity, 0)} item(s)</div>
+          <div style={{ display: "flex" }}>
+            {STAGES.map((s, i) => (
+              <div key={s} style={{ flex: 1, textAlign: "center", position: "relative" }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", margin: "0 auto 8px", background: i <= stageOf(order) ? "#3dbd83" : "#2b2218", color: i <= stageOf(order) ? "#fff" : "#6e6353", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{i <= stageOf(order) ? "✓" : i + 1}</div>
+                <div style={{ fontSize: 10.5, color: i <= stageOf(order) ? "#f0e6d2" : "#6e6353" }}>{s}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {result === "pending" && (
+        <div className="fade-in" style={{ marginTop: 22, background: "#1f1812", border: "1px solid rgba(197,162,85,0.25)", borderRadius: 10, padding: 24, textAlign: "center" }}>
+          <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.8, marginBottom: 16 }}>We couldn't look that order up instantly{customer ? "" : " (sign in to see your order history)"} — but Sushma can check it for you right away.</p>
+          <button onClick={() => window.open(`https://wa.me/18578001282?text=${encodeURIComponent(`Hi! Can you check the status of my order ${form.order}?`)}`, "_blank")} style={{ padding: "13px 28px", background: "#25D366", color: "#fff", border: "none", borderRadius: 6, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Check via WhatsApp</button>
+          <div onClick={() => navigate("account")} style={{ fontSize: 12.5, color: "#e8c97a", cursor: "pointer", textDecoration: "underline", marginTop: 14 }}>Sign in to view order history</div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2007,7 +1948,7 @@ function TestimonialAndBooking({ navigate, products = [] }) {
   const googleUrl = g?.googleUrl || "https://www.google.com/maps/search/?api=1&query=Chaubandi%20Arlington%20MA";
 
   return (
-    <section style={{ margin: "64px 0", background: "#16110c", borderTop: "1px solid #2b2218", borderBottom: "1px solid #2b2218", overflow: "hidden" }}>
+    <section id="cb-reviews" style={{ margin: "64px 0", background: "#16110c", borderTop: "1px solid #2b2218", borderBottom: "1px solid #2b2218", overflow: "hidden" }}>
       {/* Heading + Google rating badge */}
       <div style={{ padding: "48px 32px 8px", textAlign: "center" }}>
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 32, fontWeight: 400, color: "#f0e6d2", marginBottom: 16 }}>Loved by Our Customers</h2>
@@ -2481,6 +2422,15 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
   const deliveryDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toLocaleDateString("en-US", { day: "numeric", month: "long" });
 
+  /* Raas-style info tabs + shipping timeline */
+  const [tab, setTab] = useState("desc");
+  const fmtDay = (o) => new Date(Date.now() + o * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+  const TIMELINE = [
+    { icon: "🛍", date: fmtDay(0), label: "Purchased" },
+    { icon: "📦", date: `${fmtDay(1)} – ${fmtDay(2)}`, label: "Processing" },
+    { icon: "🚚", date: `${fmtDay(4)} – ${fmtDay(8)}`, label: "Delivered" },
+  ];
+
   const handleAdd = () => {
     if (!selectedSize) { setSizeError(true); return; }
     addToCart(product, selectedSize, qty);
@@ -2513,306 +2463,180 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
 
   return (
     <div style={{ background: "#0d0a08", fontFamily: "'Outfit',sans-serif" }}>
-      <div className="mobile-stack" style={{ maxWidth: 1440, margin: "0 auto", padding: "24px 32px 0", display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: 40, alignItems: "start" }}>
 
-        {/* ════════ LEFT — 2-COLUMN IMAGE GRID ════════ */}
+      {/* ── TRUST BAR (Raas-style) ── */}
+      <div style={{ borderBottom: "1px solid #2b2218", background: "#16110c" }}>
+        <div style={{ maxWidth: 1300, margin: "0 auto", padding: "13px 32px", display: "flex", justifyContent: "center", gap: 38, flexWrap: "wrap" }}>
+          {[["🏠", "Based in & Ships From", "Arlington, MA"], ["↩️", "14-Day", "Easy Returns"], ["✂️", "Free Alterations", "Perfect-Fit Promise"], ["⭐", "4.9 Google Rating", "Loved by Customers"], ["🧵", "Handcrafted", "By Master Artisans"]].map(([ic, a, b]) => (
+            <div key={a} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ fontSize: 16 }}>{ic}</span>
+              <div><div style={{ fontSize: 11.5, color: "#f0e6d2", fontWeight: 600 }}>{a}</div><div style={{ fontSize: 10.5, color: "#c5a255" }}>{b}</div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mobile-stack" style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 32px 0", display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 48, alignItems: "start" }}>
+
+        {/* ── GALLERY ── */}
         <div>
-          {/* single-slide carousel — arrows/dots advance one slide at a time */}
-          <div style={{ position: "relative", width: "100%", aspectRatio: "2/3", background: product.color || "#1f1812", overflow: "hidden", borderRadius: 2 }}>
+          <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: product.color || "#1f1812", overflow: "hidden", borderRadius: 8 }}>
             <div style={{ display: "flex", width: `${slides.length * 100}%`, height: "100%", transform: `translateX(-${slide * (100 / slides.length)}%)`, transition: "transform .45s cubic-bezier(.4,0,.2,1)" }}>
               {slides.map((s, i) => (
                 <div key={i} style={{ width: `${100 / slides.length}%`, height: "100%", flexShrink: 0, position: "relative", background: product.color || "#1f1812" }}>
                   {s && s.video ? (
-                    /* reserved AI-video slot */
-                    <div style={{ position: "absolute", inset: 0, background: "#0d0a08", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-                      <div style={{ width: 76, height: 76, borderRadius: "50%", border: "1.5px solid rgba(232,201,122,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="#e8c97a"><path d="M8 5v14l11-7z"/></svg>
+                    <div style={{ position: "absolute", inset: 0, background: "#0d0a08", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+                      <div style={{ width: 70, height: 70, borderRadius: "50%", border: "1.5px solid rgba(232,201,122,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="#e8c97a"><path d="M8 5v14l11-7z"/></svg>
                       </div>
-                      <div style={{ fontSize: 12, letterSpacing: 2.5, color: "#e8c97a", textTransform: "uppercase" }}>AI Video</div>
-                      <div style={{ fontSize: 12, color: "#6e6353", letterSpacing: 1 }}>Coming soon</div>
+                      <div style={{ fontSize: 11, letterSpacing: 2.5, color: "#e8c97a", textTransform: "uppercase" }}>AI Video · Coming Soon</div>
                     </div>
                   ) : s ? (
-                    <img src={s} alt={`${product.name} view ${i + 1}`} loading={i > 0 ? "lazy" : "eager"}
-                      onClick={() => { setZoomImg(s); setZoomed(false); }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }} />
+                    <img src={s} alt={`${product.name} view ${i + 1}`} loading={i > 0 ? "lazy" : "eager"} onClick={() => setZoomImg(s)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }} />
                   ) : null}
-
-                  {/* "Contains" chip — first photo slide only */}
                   {i === 0 && s && !s.video && (
-                    <div style={{ position: "absolute", bottom: 16, right: 16, background: "rgba(22,17,12,0.85)", borderRadius: 100, padding: "7px 14px", fontSize: 11, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 6 }}>
-                      Contains: Choli, Lehenga, Dupatta
-                      <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#a3947c", color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>?</span>
+                    <div style={{ position: "absolute", bottom: 14, left: 14, background: "rgba(22,17,12,0.85)", borderRadius: 100, padding: "6px 13px", fontSize: 11, color: "#f0e6d2" }}>
+                      Contains: {product.cat === "Sarees" ? "Saree, Blouse" : "Choli, Lehenga, Dupatta"}
                     </div>
                   )}
                 </div>
               ))}
             </div>
-
-            {/* prev / next */}
-            <button aria-label="Previous" onClick={() => setSlide(p => (p - 1 + slides.length) % slides.length)} style={{ ...arrowBtn, left: 16 }}>
-              <ChevronLeft size={22} strokeWidth={2} color="#1a1208" />
-            </button>
-            <button aria-label="Next" onClick={() => setSlide(p => (p + 1) % slides.length)} style={{ ...arrowBtn, right: 16 }}>
-              <ChevronRight size={22} strokeWidth={2} color="#1a1208" />
-            </button>
-
-            {/* slide dots */}
-            <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 3 }}>
-              {slides.map((_, i) => (
-                <span key={i} onClick={() => setSlide(i)} style={{ width: i === slide ? 22 : 8, height: 8, borderRadius: 100, background: i === slide ? "#e8c97a" : "rgba(240,235,228,0.55)", cursor: "pointer", transition: "all .3s" }} />
-              ))}
+            <button aria-label="Previous" onClick={() => setSlide(p => (p - 1 + slides.length) % slides.length)} style={{ ...arrowBtn, left: 14, width: 40, height: 40 }}><ChevronLeft size={19} color="#1a1208" /></button>
+            <button aria-label="Next" onClick={() => setSlide(p => (p + 1) % slides.length)} style={{ ...arrowBtn, right: 14, width: 40, height: 40 }}><ChevronRight size={19} color="#1a1208" /></button>
+            <span onClick={() => toggleWishlist && toggleWishlist(product.id)} style={{ position: "absolute", top: 14, right: 14, width: 38, height: 38, borderRadius: "50%", background: "rgba(22,17,12,0.8)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 3 }}>
+              <Heart size={18} color="#e8c97a" fill={wishlist ? "#e8c97a" : "none"} />
+            </span>
+            <div style={{ position: "absolute", bottom: 14, right: 14, display: "flex", gap: 7, zIndex: 3 }}>
+              {slides.map((_, i) => <span key={i} onClick={() => setSlide(i)} style={{ width: i === slide ? 20 : 7, height: 7, borderRadius: 100, background: i === slide ? "#e8c97a" : "rgba(240,235,228,0.5)", cursor: "pointer", transition: "all .3s" }} />)}
             </div>
           </div>
-
-          {/* breadcrumb under images, AZA-style */}
-          <div style={{ fontSize: 12, color: "#6e6353", padding: "16px 4px 40px" }}>
-            <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span>/
-            <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>Women</span>/
-            <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>{product.cat}</span>/
-            <span>Classic {product.cat}</span>
+          <div style={{ fontSize: 12, color: "#6e6353", padding: "14px 4px 32px" }}>
+            <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span style={{ cursor: "pointer" }} onClick={() => navigate("shop")}>{product.cat}</span> / <span style={{ color: "#a3947c" }}>{product.name}</span>
           </div>
         </div>
 
-        {/* ════════ RIGHT — STICKY INFO PANEL ════════ */}
-        <div style={{ position: "sticky", top: 90, paddingBottom: 40 }}>
-
-          {/* Exclusive badge */}
-          <div style={{ display: "inline-block", background: "#1f1812", padding: "5px 10px", borderRadius: 3, fontSize: 12, marginBottom: 12 }}>
-            <span style={{ color: "#e8c97a", fontWeight: 600 }}>Chaubandi</span> <span style={{ color: "#f0e6d2" }}>Exclusive</span>
+        {/* ── INFO (minimal) ── */}
+        <div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 400, color: "#f0e6d2", lineHeight: 1.2, marginBottom: 6 }}>{product.name}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: "#6e6353", letterSpacing: 1 }}>CB-{String(product.id).slice(-4).padStart(4, "0").toUpperCase()}</span>
+            <span style={{ fontSize: 12, color: "#c5a255" }}>{"★".repeat(Math.round(avgRating))} {avgRating.toFixed(1)}{userReviews.length ? ` (${userReviews.length})` : ""}</span>
           </div>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: "#f0e6d2", marginBottom: 6 }}>${product.price}</div>
+          <p style={{ fontSize: 12.5, color: "#a3947c", marginBottom: 22, lineHeight: 1.6 }}>Free U.S. shipping · Free 14-day returns · Free alterations included.</p>
 
-          {/* Title row + share/wishlist */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div>
-              <div onClick={() => navigate("shop")} style={{ fontSize: 21, fontWeight: 600, color: "#f0e6d2", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                Chaubandi Boston
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a3947c" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-              </div>
-              <div style={{ fontSize: 14, color: "#a3947c", lineHeight: 1.5 }}>{product.name}</div>
-            </div>
-            <div style={{ display: "flex", gap: 14, flexShrink: 0, paddingTop: 4 }}>
-              <svg onClick={() => { try { navigator.share?.({ title: product.name, url: window.location.href }); } catch(e){} }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5" style={{ cursor: "pointer" }}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
-              <Heart size={20} style={{ cursor: "pointer" }} fill={wishlist ? "#e8c97a" : "none"} color={wishlist ? "#e8c97a" : "#f0e6d2"} onClick={() => toggleWishlist && toggleWishlist(product.id)} />
-            </div>
+          {/* size */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", textTransform: "uppercase" }}>Size</span>
+            <span onClick={() => navigate("fit")} style={{ fontSize: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Size chart 📏</span>
           </div>
-
-          {/* Price */}
-          <div style={{ fontSize: 22, fontWeight: 600, color: "#f0e6d2", margin: "14px 0 18px" }}>${product.price}</div>
-
-          {/* LIVE MIRROR banner */}
-          <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 14, padding: 10, marginBottom: 22, background: "#1f1812", border: "1px solid rgba(197,162,85,0.35)" }}>
-            <div style={{ width: 56, height: 64, borderRadius: 6, background: product.color || "#2b2218", overflow: "hidden", flexShrink: 0 }}>
-              {product.images?.[0] && <img src={product.images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3dbd83" }} />
-                <span style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 600, color: "#f0e6d2" }}>LIVE MIRROR</span>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#f0e6d2" }}>Preview this look on you</div>
-            </div>
-            <button onClick={() => navigate("live")} style={{ padding: "10px 22px", background: "#16110c", border: "1px solid #e8c97a", color: "#e8c97a", borderRadius: 4, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Try Now</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: sizeError ? 8 : 18 }}>
+            {ALL_SIZES.map(s => (
+              <button key={s} onClick={() => { setSelectedSize(s); setSizeError(false); }}
+                style={{ minWidth: 44, padding: "10px 13px", borderRadius: 4, border: `1.5px solid ${selectedSize === s ? "#c5a255" : "#2b2218"}`, background: selectedSize === s ? "#c5a255" : "transparent", color: selectedSize === s ? "#1a1208" : "#f0e6d2", fontSize: 12.5, cursor: "pointer", fontFamily: "'Outfit',sans-serif", fontWeight: selectedSize === s ? 700 : 400 }}>
+                {s}
+              </button>
+            ))}
           </div>
+          {sizeError && <div style={{ fontSize: 12, color: "#e8a0a0", marginBottom: 14 }}>Please select a size first.</div>}
 
-          {/* Colors */}
-          {variants.length > 1 && (
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, color: "#f0e6d2", letterSpacing: 1, marginBottom: 10 }}>Colors</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {variants.map(v => (
-                  <div key={v.id} onClick={() => navigate("product", v)} style={{ width: 56, height: 68, borderRadius: 4, overflow: "hidden", cursor: "pointer", border: v.id === product.id ? "2px solid #c5a255" : "2px solid transparent", outline: "1px solid #2b2218", background: v.color || "#2b2218" }}>
-                    {v.images?.[0] && <img src={v.images[0]} alt={v.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Size */}
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 500, color: "#f0e6d2" }}>Select size</span>
-              <span style={{ fontSize: 13, color: "#f0e6d2", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><path d="M3 17l6-13 6 13M5.5 12h7M14 17h7M16 13.5L18.5 17l2.5-3.5"/></svg>
-                Size guide
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {ALL_SIZES.map(s => (
-                <button key={s} onClick={() => { setSelectedSize(s); setSizeError(false); }} style={{ minWidth: 46, height: 40, padding: "0 12px", border: `1px solid ${s === selectedSize ? "#c5a255" : "#2b2218"}`, background: s === selectedSize ? "#c5a255" : "#16110c", color: s === selectedSize ? "#1a1208" : "#f0e6d2", borderRadius: 4, fontSize: 13, cursor: "pointer", fontFamily: "'Outfit',sans-serif", transition: "all .15s" }}>{s}</button>
-              ))}
-            </div>
-            {sizeError && <div style={{ fontSize: 12, color: "#e8c97a", marginTop: 8 }}>Please select a size</div>}
-          </div>
-
-          {/* Qty */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-            <span style={{ fontSize: 13, color: "#f0e6d2" }}>Qty:</span>
-            <select value={qty} onChange={e => setQty(Number(e.target.value))} style={{ height: 38, padding: "0 12px", border: "1px solid #2b2218", borderRadius: 4, fontSize: 13, fontFamily: "'Outfit',sans-serif", background: "#16110c", cursor: "pointer", outline: "none" }}>
-              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-
-          {/* CTA row */}
-          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 22 }}>
-            <button onClick={handleAdd} style={{ height: 50, background: added ? "#3dbd83" : "#e8c97a", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background .25s" }}>
-              <ShoppingBag size={17} /> {added ? "Added ✓" : "Add To Cart"}
-            </button>
-            <button onClick={() => navigate("live")} style={{ height: 50, background: "#16110c", color: "#f0e6d2", border: "1px solid rgba(197,162,85,0.5)", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <User size={17} /> Speak To Stylist
-            </button>
-          </div>
-
-          {/* Country row */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1f1812", borderRadius: 6, padding: "13px 16px", marginBottom: 12 }}>
-            <span style={{ fontSize: 13, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><path d="M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
-              UNITED STATES OF AMERICA
-            </span>
-            <span style={{ fontSize: 13, color: "#f0e6d2", fontWeight: 500, cursor: "pointer" }}>Change</span>
-          </div>
-
-          {/* Delivery estimate */}
-          <div style={{ ...S.card, padding: "14px 16px", marginBottom: 8 }}>
-            <span style={{ fontSize: 13.5, color: "#f0e6d2" }}>
-              Standard <span style={{ color: "#3dbd83", fontWeight: 600 }}>Assured</span> Delivery by <span style={{ color: "#e8c97a", fontWeight: 600 }}>{deliveryDate}</span>
-            </span>
-          </div>
-          <div onClick={() => window.open("https://wa.me/18578001282?text=" + encodeURIComponent(`Hi! I need ${product.name} by a specific date. Can you help?`), "_blank")} style={{ fontSize: 12.5, color: "#a3947c", marginBottom: 28, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a3947c" strokeWidth="1.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-            Need it by a specific date? <span style={{ textDecoration: "underline", fontWeight: 500 }}>Chat with us</span>
-          </div>
-
-          {/* ── Shop with Confidence ── */}
-          <div style={{ borderBottom: "1px solid #2b2218", paddingBottom: 26, marginBottom: 26 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2", marginBottom: 18 }}>Shop with Confidence</h3>
-            <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px" }}>
-              {[
-                "No customs or import duties", "US-based — ships from Boston",
-                "No extra charges at delivery", "Personalized Styling Assistance",
-                "Free alterations included", "Owner-led, trusted service",
-              ].map(t => (
-                <div key={t} style={S.checkRow}>
-                  <span style={S.check}>✓</span>{t}
+          {/* color / style variants */}
+          {variants.length > 1 && <>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", textTransform: "uppercase", marginBottom: 10 }}>More in {product.cat}</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {variants.map(v => (
+                <div key={v.id} onClick={() => navigate("product", v)} title={v.name}
+                  style={{ width: 46, height: 58, borderRadius: 4, overflow: "hidden", cursor: "pointer", border: `1.5px solid ${v.id === product.id ? "#c5a255" : "#2b2218"}`, background: v.color }}>
+                  {v.images?.[0] && <img src={v.images[0]} alt={v.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
                 </div>
               ))}
             </div>
-          </div>
+          </>}
 
-          {/* ── Offers & EMI ── */}
-          <div style={{ borderBottom: "1px solid #2b2218", paddingBottom: 26, marginBottom: 4 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2", marginBottom: 18 }}>Offers &amp; EMI</h3>
+          <div style={{ fontSize: 12.5, color: "#e8c97a", marginBottom: 6 }}>EXCLUSIVE: Complimentary made-to-measure on every piece!</div>
+          <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 20, lineHeight: 1.6 }}>Between sizes? Size up for the most comfortable fit — our alterations are always free.</p>
 
-            {/* Best coupon card */}
-            <div style={{ ...S.card, overflow: "hidden", marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
-                <span style={{ fontSize: 13.5, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 8 }}>
-                  Best Coupon: <strong>WELCOME10</strong>
-                  <svg onClick={copyCoupon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a3947c" strokeWidth="1.5" style={{ cursor: "pointer" }}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
-                  {copied && <span style={{ fontSize: 11, color: "#3dbd83" }}>Copied!</span>}
-                </span>
-                <span style={{ fontSize: 12.5, color: "#a3947c", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  | &nbsp;+ 2 More
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8c97a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M10 8l4 4-4 4"/></svg>
-                </span>
-              </div>
-              <div style={{ background: "#1f1812", textAlign: "center", padding: "7px 0", fontSize: 12, color: "#c5a255" }}>
-                Save extra 10% on your first order
-              </div>
-            </div>
-
-            {/* Cash back card */}
-            <div style={{ ...S.card, padding: "14px 16px", marginBottom: 12, fontSize: 13.5, color: "#f0e6d2", display: "flex", alignItems: "center", gap: 6 }}>
-              Earn ${Math.round(product.price * 0.02)} Chaubandi Cash
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6e6353" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-            </div>
-
-            {/* Price match card */}
-            <div style={{ ...S.card, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#f0e6d2", marginBottom: 2 }}>Price Match Promise</div>
-                <div style={{ fontSize: 12.5, color: "#a3947c" }}>Found it cheaper? We'll match it.</div>
-              </div>
-              <span style={{ fontSize: 12.5, color: "#a3947c", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                | &nbsp;Know More
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8c97a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M10 8l4 4-4 4"/></svg>
-              </span>
-            </div>
-          </div>
-
-          {/* ── Product Details accordion ── */}
-          <div style={{ borderBottom: "1px solid #2b2218" }}>
-            <button style={S.accHead} onClick={() => setOpenAcc(openAcc === "details" ? null : "details")}>
-              <span style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2" }}>Product Details</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5" style={{ transform: openAcc === "details" ? "rotate(180deg)" : "none", transition: "transform .2s" }}><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-            {openAcc === "details" && (
-              <div style={{ paddingBottom: 22, fontSize: 13.5, color: "#a3947c", lineHeight: 1.8 }}>
-                <p style={{ margin: "0 0 10px" }}>{product.desc}</p>
-                <p style={{ margin: 0 }}><strong>Style code:</strong> CB-{product.cat.toUpperCase().slice(0,3)}-{product.id.toString().padStart(4,"0")} · <strong>Fit:</strong> Semi-stitched, custom tailored · <strong>Care:</strong> Dry clean only</p>
-              </div>
-            )}
-          </div>
-
-          {/* ── Shipping & Returns accordion (open by default) ── */}
-          <div style={{ borderBottom: "1px solid #2b2218", marginBottom: 26 }}>
-            <button style={S.accHead} onClick={() => setOpenAcc(openAcc === "shipping" ? null : "shipping")}>
-              <span style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2" }}>Shipping &amp; Returns</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5" style={{ transform: openAcc === "shipping" ? "rotate(180deg)" : "none", transition: "transform .2s" }}><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-            {openAcc === "shipping" && (
-              <div style={{ paddingBottom: 22, display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={S.checkRow}><span style={S.check}>✓</span>Free Shipping</div>
-                <div style={S.checkRow}>
-                  <span style={S.check}>✓</span>
-                  <span style={{ lineHeight: 1.7 }}>
-                    Returnable within 3 days of delivery for store credit. Custom-stitched and altered orders are not returnable. Product's original tags, if attached, must be intact for a successful return. If the original tags are missing, Chaubandi may decline the return request and send the product back to the customer. Return handling charges would be applicable.
-                    <span style={{ display: "block", marginTop: 6, textDecoration: "underline", fontWeight: 500, cursor: "pointer" }} onClick={() => navigate("contact")}>More Details</span>
-                  </span>
+          {/* shipping timeline */}
+          <div style={{ display: "flex", alignItems: "center", border: "1px solid #2b2218", borderRadius: 8, padding: "14px 10px", marginBottom: 20, background: "#16110c" }}>
+            {TIMELINE.map((t, i) => (
+              <div key={t.label} style={{ flex: 1, display: "flex", alignItems: "center" }}>
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ fontSize: 15 }}>{t.icon}</div>
+                  <div style={{ fontSize: 11.5, color: "#f0e6d2", fontWeight: 600, marginTop: 3 }}>{t.date}</div>
+                  <div style={{ fontSize: 10.5, color: "#a3947c" }}>{t.label}</div>
                 </div>
+                {i < TIMELINE.length - 1 && <div style={{ width: 26, height: 1, background: "#3a3026", flexShrink: 0 }} />}
               </div>
-            )}
+            ))}
           </div>
 
-          {/* ── Customer Support ── */}
-          <div style={{ marginBottom: 30 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2", marginBottom: 16 }}>Customer Support</h3>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => window.open("https://wa.me/18578001282", "_blank")} style={{ padding: "11px 18px", border: "1px solid #2b2218", borderRadius: 100, background: "#16110c", fontSize: 13, color: "#f0e6d2", cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                Chat with us
-              </button>
-              <button onClick={() => window.open("tel:+18578001282")} style={{ padding: "11px 18px", border: "1px solid #2b2218", borderRadius: 100, background: "#16110c", fontSize: 13, color: "#f0e6d2", cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.96.37 1.9.72 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0122 16.92z"/></svg>
-                +1 857-800-1282
-              </button>
-              <button onClick={() => navigate("contact")} style={{ padding: "11px 18px", border: "1px solid #2b2218", borderRadius: 100, background: "#16110c", fontSize: 13, color: "#f0e6d2", cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>
-                Mail us
-              </button>
+          {/* qty + CTA */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", border: "1px solid #2b2218", borderRadius: 4 }}>
+              <button onClick={() => setQty(Math.max(1, qty - 1))} style={{ border: "none", background: "none", color: "#f0e6d2", cursor: "pointer", padding: "0 14px", height: 52 }}><Minus size={14} /></button>
+              <span style={{ minWidth: 20, textAlign: "center", fontSize: 14 }}>{qty}</span>
+              <button onClick={() => setQty(qty + 1)} style={{ border: "none", background: "none", color: "#f0e6d2", cursor: "pointer", padding: "0 14px", height: 52 }}><Plus size={14} /></button>
             </div>
+            <button className="btn-shine" onClick={handleAdd} style={{ flex: 1, height: 52, background: added ? "#3dbd83" : "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 13, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif", transition: "background .3s" }}>
+              {added ? "✓ Added to Cart" : "Add to Cart"}
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
+            <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20have%20a%20question%20about%20" + encodeURIComponent(product.name), "_blank")} style={{ flex: 1, height: 44, background: "transparent", border: "1px solid #2b2218", color: "#f0e6d2", borderRadius: 4, fontSize: 11.5, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>💬 Speak to Stylist</button>
+            <button onClick={() => navigate("live")} style={{ flex: 1, height: 44, background: "transparent", border: "1px solid rgba(197,162,85,0.4)", color: "#e8c97a", borderRadius: 4, fontSize: 11.5, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>🪞 Try Live Mirror</button>
           </div>
 
-          {/* ── View All Best Paired ── */}
-          <div>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "#f0e6d2", marginBottom: 16 }}>View All Best Paired</h3>
-            <div style={{ position: "relative" }}>
-              <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6, scrollbarWidth: "thin" }}>
-                {bestPaired.map(p => (
-                  <div key={p.id} onClick={() => navigate("product", p)} style={{ width: 96, height: 110, borderRadius: 8, overflow: "hidden", flexShrink: 0, cursor: "pointer", background: p.color || "#1f1812" }}>
-                    {p.images?.[0] && <img src={p.images[0]} alt={p.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                  </div>
-                ))}
-              </div>
-              <div style={{ position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)", width: 34, height: 34, borderRadius: "50%", background: "#16110c", boxShadow: "0 1px 8px rgba(0,0,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-              </div>
-            </div>
+          {/* confidence */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 18 }}>
+            {["Free 14-day return policy — shop with confidence", "Free alterations with every purchase", "Need it fast? Express options — WhatsApp +1 (857) 800-1282", "100% secure payments"].map(t => (
+              <div key={t} style={S.checkRow}><span style={S.check}>✓</span><span style={{ color: "#a3947c" }}>{t}</span></div>
+            ))}
           </div>
 
+          {/* coupon */}
+          <div onClick={copyCoupon} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#e8c97a", cursor: "pointer", border: "1px dashed rgba(197,162,85,0.5)", borderRadius: 6, padding: "9px 14px" }}>
+            🎟 Best code: <strong>WELCOME10</strong> — 10% off {copied ? "· Copied!" : "· Tap to copy"}
+          </div>
         </div>
       </div>
 
+      {/* ── INFO TABS ── */}
+      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "52px 32px 10px" }}>
+        <div style={{ display: "flex", gap: 26, borderBottom: "1px solid #2b2218", overflowX: "auto", whiteSpace: "nowrap" }} className="rev-track">
+          {[["desc", "Description"], ["sizefit", "Size, Fit & Customization"], ["shipping", "Shipping, Delivery & Return"], ["custom", "Made to Measure"], ["care", "Care & Disclaimer"]].map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} style={{ background: "none", border: "none", padding: "0 2px 13px", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", fontFamily: "'Outfit',sans-serif", color: tab === k ? "#f0e6d2" : "#6e6353", fontWeight: tab === k ? 700 : 400, borderBottom: tab === k ? "2px solid #c5a255" : "2px solid transparent" }}>{label}</button>
+          ))}
+        </div>
+        <div style={{ padding: "26px 2px 10px", maxWidth: 860 }}>
+          {tab === "desc" && <>
+            <p style={{ fontSize: 14, color: "#a3947c", lineHeight: 1.8, marginBottom: 14 }}>{product.desc}</p>
+            <ul style={{ fontSize: 13, color: "#a3947c", lineHeight: 2, paddingLeft: 18 }}>
+              <li>Handcrafted by master artisans — no two pieces are identical</li>
+              <li>Premium fabrics and embroidery, quality-checked before dispatch</li>
+              <li>Ships from our Arlington, MA boutique within 24–48 hours</li>
+            </ul>
+          </>}
+          {tab === "sizefit" && INFO_CONTENT.sizing.blocks.map(([h, t]) => (
+            <div key={h} style={{ marginBottom: 16 }}><div style={{ fontSize: 13.5, color: "#f0e6d2", fontWeight: 600, marginBottom: 5 }}>{h}</div><p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.75 }}>{t}</p></div>
+          ))}
+          {tab === "shipping" && [...INFO_CONTENT.shipping.blocks.slice(0, 2), ...INFO_CONTENT.returns.blocks.slice(0, 2)].map(([h, t]) => (
+            <div key={h} style={{ marginBottom: 16 }}><div style={{ fontSize: 13.5, color: "#f0e6d2", fontWeight: 600, marginBottom: 5 }}>{h}</div><p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.75 }}>{t}</p></div>
+          ))}
+          {tab === "custom" && <>
+            <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.8, marginBottom: 14 }}>We want every piece to fit you perfectly — that's why <strong style={{ color: "#f0e6d2" }}>made-to-measure adjustments are complimentary on all orders</strong>. Select "Custom" as your size (where available) or note your request at checkout, and we'll collect these measurements:</p>
+            <ol style={{ fontSize: 13, color: "#a3947c", lineHeight: 2, paddingLeft: 18, marginBottom: 14 }}>
+              <li>Bust</li><li>Under bust</li><li>Waist</li><li>Height</li><li>Desired dress/gown length</li><li>Desired skirt/lehenga length</li>
+            </ol>
+            <p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.75, marginBottom: 16 }}><strong style={{ color: "#f0e6d2" }}>Turnaround:</strong> made-to-measure pieces ship within 1–5 weeks from when we receive your measurements.</p>
+            <button onClick={() => navigate("fit")} style={{ padding: "12px 26px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Save My Measurements →</button>
+          </>}
+          {tab === "care" && <>
+            <p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.8, marginBottom: 12 }}>Dry clean only. Store folded in a breathable cotton bag away from direct sunlight. Iron on low heat with a protective cloth — never directly on embroidery, sequins, or zari work.</p>
+            <p style={{ fontSize: 12.5, color: "#6e6353", lineHeight: 1.7 }}>Colors may vary slightly from photos due to screen settings and the handcrafted nature of each piece. Minor irregularities in embroidery are a hallmark of genuine handwork, not defects.</p>
+          </>}
+        </div>
+      </section>
       {/* ════════ CUSTOMER REVIEWS ════════ */}
       <section style={{ maxWidth: 900, margin: "0 auto", padding: "48px 32px 8px", borderTop: "1px solid #2b2218" }}>
         <div style={{ textAlign: "center", marginBottom: 26 }}>
