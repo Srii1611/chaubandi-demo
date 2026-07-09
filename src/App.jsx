@@ -221,6 +221,12 @@ export default function App() {
     if (!cartId) throw new Error("offline");
     const order = await medusa.placeOrder(cartId, form, deliveryMethod);
     setPlacedOrder(order);
+    // Keep a local record so guests can use the Track Order page.
+    try {
+      const rec = { display_id: order.display_id, email: (form.email || "").toLowerCase(), created_at: order.created_at || new Date().toISOString(), items: (order.items || []).map(i => ({ title: i.product_title || i.title, qty: i.quantity })), method: deliveryMethod };
+      const list = JSON.parse(localStorage.getItem("cb_orders") || "[]");
+      localStorage.setItem("cb_orders", JSON.stringify([rec, ...list].slice(0, 20)));
+    } catch { /* ignore */ }
     setCart([]);
     try {
       const fresh = await medusa.createCart();
@@ -266,6 +272,9 @@ export default function App() {
           .mobile-grid { grid-template-columns: 1fr !important; gap: 24px !important; padding: 32px 16px !important; }
           .mobile-hide { display: none !important; }
           .mobile-hero-text { font-size: 40px !important; }
+          .mobile-only { display: inline-flex !important; }
+          .shop-sidebar { display: none !important; }
+          .shop-layout { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -455,6 +464,9 @@ export default function App() {
         </div>
       </>}
 
+      {/* Floating widgets: chat bubble, reviews tab, 10%-off tab */}
+      <FloatingWidgets navigate={navigate} />
+
       {/* Category Strip */}
       {page === "shop" && <CategoryStrip navigate={navigate} setShopFilter={setShopFilter} activeFilter={shopFilter} />}
 
@@ -472,6 +484,7 @@ export default function App() {
         {page === "design" && <DesignStudioPage navigate={navigate} />}
         {page === "fit" && <PerfectFitPage navigate={navigate} customer={customer} />}
         {page === "info" && <InfoPage topic={infoTopic} goInfo={goInfo} navigate={navigate} />}
+        {page === "track" && <TrackOrderPage navigate={navigate} customer={customer} />}
       </main>
 
       {/* Global Footer */}
@@ -481,6 +494,7 @@ export default function App() {
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>Help</h4>
             {[
               { label: "Contact Us", go: () => navigate("contact") },
+              { label: "Track Order", go: () => navigate("track") },
               { label: "Shipping Info", go: () => goInfo("shipping") },
               { label: "Returns & Exchanges", go: () => goInfo("returns") },
               { label: "FAQ", go: () => goInfo("faq") },
@@ -535,6 +549,208 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/* ─── TRACK ORDER (public — order # + email) ─── */
+function TrackOrderPage({ navigate, customer }) {
+  const [form, setForm] = useState({ orderNo: "", email: customer?.email || "" });
+  const [result, setResult] = useState(null); // { found, order? }
+  const [busy, setBusy] = useState(false);
+
+  const lookup = async () => {
+    const num = form.orderNo.replace(/^cb-?/i, "").trim();
+    const email = form.email.trim().toLowerCase();
+    if (!num || !email) return;
+    setBusy(true);
+    let order = null;
+    // Logged-in: check real Medusa orders first.
+    if (customer) {
+      try {
+        const list = await medusa.listCustomerOrders();
+        order = list.find(o => String(o.display_id) === num && (o.email || "").toLowerCase() === email);
+        if (order) order = { display_id: order.display_id, created_at: order.created_at, items: (order.items || []).map(i => ({ title: i.product_title || i.title, qty: i.quantity })) };
+      } catch { /* fall through to local */ }
+    }
+    if (!order) {
+      try {
+        const list = JSON.parse(localStorage.getItem("cb_orders") || "[]");
+        order = list.find(o => String(o.display_id) === num && o.email === email);
+      } catch { /* ignore */ }
+    }
+    setResult({ found: !!order, order });
+    setBusy(false);
+  };
+
+  const STAGES = ["Order Confirmed", "Being Prepared", "Shipped", "Delivered"];
+  const stageOf = (o) => {
+    const days = (Date.now() - new Date(o.created_at).getTime()) / 86400000;
+    return days < 1 ? 0 : days < 3 ? 1 : days < 6 ? 2 : 3;
+  };
+
+  const field = { width: "100%", height: 48, border: "1px solid #2b2218", borderRadius: 6, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" };
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "64px 32px 90px" }}>
+      <div className="fade-in" style={{ textAlign: "center", marginBottom: 30 }}>
+        <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 12 }}>Where's My Order?</div>
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 38, fontWeight: 300 }}>Track Your Order</h1>
+        <p style={{ fontSize: 13.5, color: "#a3947c", marginTop: 10, lineHeight: 1.7 }}>Enter your order number (from your confirmation) and the email you used at checkout.</p>
+      </div>
+      <div className="fade-in d1" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 26 }}>
+        <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#a3947c", display: "block", marginBottom: 7 }}>Order Number</label>
+        <input value={form.orderNo} onChange={e => setForm({ ...form, orderNo: e.target.value })} placeholder="e.g. CB-1024" style={{ ...field, marginBottom: 14 }} />
+        <label style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#a3947c", display: "block", marginBottom: 7 }}>Email</label>
+        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} onKeyDown={e => { if (e.key === "Enter") lookup(); }} placeholder="you@example.com" style={{ ...field, marginBottom: 18 }} />
+        <button onClick={lookup} disabled={busy} className="btn-shine" style={{ width: "100%", height: 50, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: busy ? "wait" : "pointer", fontFamily: "'Outfit',sans-serif" }}>{busy ? "Looking up…" : "Track Order"}</button>
+      </div>
+
+      {result && !result.found && (
+        <div className="fade-in" style={{ marginTop: 22, padding: "18px 20px", background: "rgba(120,30,30,0.18)", border: "1px solid rgba(180,60,60,0.35)", borderRadius: 8, fontSize: 13.5, color: "#e8c0c0", lineHeight: 1.7 }}>
+          We couldn't find that order. Double-check the number and email, or message us on <span onClick={() => window.open("https://wa.me/18578001282?text=Hi!%20I'd%20like%20to%20check%20on%20my%20order.", "_blank")} style={{ color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>WhatsApp</span> and we'll find it for you.
+        </div>
+      )}
+
+      {result?.found && (() => {
+        const o = result.order;
+        const stage = stageOf(o);
+        return (
+          <div className="fade-in" style={{ marginTop: 22, background: "#16110c", border: "1px solid rgba(197,162,85,0.3)", borderRadius: 10, padding: 26 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#f0e6d2" }}>Order #CB-{o.display_id}</span>
+              <span style={{ fontSize: 12.5, color: "#a3947c" }}>{new Date(o.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+            </div>
+            {STAGES.map((s, i) => (
+              <div key={s} style={{ display: "flex", gap: 14, alignItems: "flex-start", paddingBottom: i < STAGES.length - 1 ? 22 : 0, position: "relative" }}>
+                {i < STAGES.length - 1 && <span style={{ position: "absolute", left: 11, top: 24, bottom: 0, width: 2, background: i < stage ? "#3dbd83" : "#2b2218" }} />}
+                <span style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, background: i <= stage ? "#3dbd83" : "#2b2218", color: i <= stage ? "#fff" : "#6e6353", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>{i <= stage ? <Check size={13} /> : <span style={{ fontSize: 11 }}>{i + 1}</span>}</span>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: i === stage ? 700 : 500, color: i <= stage ? "#f0e6d2" : "#6e6353" }}>{s}</div>
+                  {i === stage && <div style={{ fontSize: 12, color: "#a3947c", marginTop: 3 }}>{stage === 0 ? "We've received your order." : stage === 1 ? "Being carefully prepared & packed." : stage === 2 ? "On its way — tracking link in your email." : "Enjoy! Free alterations if you need them."}</div>}
+                </div>
+              </div>
+            ))}
+            {o.items?.length > 0 && <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #2b2218", fontSize: 13, color: "#a3947c" }}>{o.items.map(i => `${i.title} ×${i.qty}`).join("  •  ")}</div>}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ─── FLOATING WIDGETS: chat bubble · reviews tab · 10%-off tab ─── */
+function FloatingWidgets({ navigate }) {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSeen, setChatSeen] = useState(false);
+  const [thread, setThread] = useState([{ from: "bot", text: "Namaste! 🙏 I'm the Chaubandi assistant. What can I help you with?" }]);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [offerState, setOfferState] = useState("form"); // form | done | error
+
+  const QUICK = [
+    { q: "Do you offer custom sizing?", a: "Yes! Every purchase includes free alterations, and most pieces can be made to your exact measurements at no extra charge. Try our Perfect Fit tool or visit the boutique." },
+    { q: "How long does shipping take?", a: "Free USA shipping — in-stock items ship in 24–48 hours and arrive in 3–5 business days. Custom pieces take 2–4 weeks." },
+    { q: "Can I book a styling session?", a: "Absolutely — free video consultations via WhatsApp or Zoom, or visit us in Arlington, MA (Tue–Sun, 10–7). Tap below to chat with Sushma directly." },
+    { q: "What's your return policy?", a: "Unworn items with tags can be returned within 14 days for a refund or exchange. Custom and bridal pieces are final sale — we confirm every detail before production." },
+  ];
+
+  const ask = (item) => setThread(t => [...t, { from: "user", text: item.q }, { from: "bot", text: item.a }]);
+
+  const goReviews = () => {
+    navigate("home");
+    setTimeout(() => {
+      const h = [...document.querySelectorAll("h2")].find(e => /Loved by Our Customers/.test(e.textContent));
+      h?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 350);
+  };
+
+  const claimOffer = async () => {
+    if (!/\S+@\S+\.\S+/.test(email)) { setOfferState("error"); return; }
+    try {
+      const list = JSON.parse(localStorage.getItem("cb_newsletter") || "[]");
+      if (!list.includes(email)) list.push(email);
+      localStorage.setItem("cb_newsletter", JSON.stringify(list));
+    } catch { /* ignore */ }
+    try { await medusa.subscribeNewsletter(email); } catch { /* offline — code still shown */ }
+    setOfferState("done");
+  };
+
+  const tabBase = { position: "fixed", zIndex: 2500, background: "#2a1a3a", color: "#f0e6d2", border: "none", cursor: "pointer", fontFamily: "'Outfit',sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,0.45)" };
+
+  return (
+    <>
+      {/* Reviews side tab (left edge) */}
+      <button onClick={goReviews} aria-label="Reviews" style={{ ...tabBase, left: 0, top: "58%", padding: "14px 8px", borderRadius: "0 8px 8px 0", writingMode: "vertical-rl", textOrientation: "mixed", fontSize: 12, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#e8c97a" }}>★</span> Reviews
+      </button>
+
+      {/* Get 10% Off tab (bottom-left) */}
+      <button onClick={() => { setOfferOpen(true); setOfferState("form"); }} aria-label="Get 10% off" style={{ ...tabBase, left: 14, bottom: 14, padding: "11px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5 }}>
+        Get 10% Off
+      </button>
+
+      {/* Chat bubble (bottom-right) */}
+      <button onClick={() => { setChatOpen(o => !o); setChatSeen(true); }} aria-label="Chat with us" style={{ ...tabBase, right: 18, bottom: 18, width: 58, height: 58, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f0e6d2" strokeWidth="1.8"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        {!chatSeen && <span style={{ position: "absolute", top: -2, right: -2, width: 20, height: 20, borderRadius: "50%", background: "#e0294a", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0d0a08" }}>1</span>}
+      </button>
+
+      {/* Chat panel */}
+      {chatOpen && (
+        <div style={{ position: "fixed", right: 18, bottom: 86, width: 340, maxWidth: "calc(100vw - 36px)", maxHeight: "62vh", background: "#16110c", border: "1px solid #2b2218", borderRadius: 14, zIndex: 2501, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 48px rgba(0,0,0,0.6)" }}>
+          <div style={{ background: "#2a1a3a", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#f0e6d2" }}>Chaubandi Assistant</div>
+              <div style={{ fontSize: 11, color: "#3dbd83", display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3dbd83" }} /> Online — replies instantly</div>
+            </div>
+            <X size={18} style={{ cursor: "pointer", color: "#f0e6d2" }} onClick={() => setChatOpen(false)} />
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            {thread.map((m, i) => (
+              <div key={i} style={{ alignSelf: m.from === "user" ? "flex-end" : "flex-start", maxWidth: "85%", background: m.from === "user" ? "#c5a255" : "#241c14", color: m.from === "user" ? "#1a1208" : "#f0e6d2", borderRadius: m.from === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px", padding: "10px 13px", fontSize: 13, lineHeight: 1.55 }}>{m.text}</div>
+            ))}
+          </div>
+          <div style={{ padding: "10px 14px 14px", borderTop: "1px solid #2b2218" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
+              {QUICK.map((item) => (
+                <button key={item.q} onClick={() => ask(item)} style={{ padding: "7px 11px", background: "transparent", border: "1px solid rgba(197,162,85,0.45)", color: "#e8c97a", borderRadius: 100, fontSize: 11.5, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>{item.q}</button>
+              ))}
+            </div>
+            <button onClick={() => window.open("https://wa.me/18578001282?text=Hi%20Sushma!%20I%20have%20a%20question.", "_blank")} style={{ width: "100%", height: 42, background: "#25D366", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: 0.5, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
+              💬 Chat with Sushma on WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 10% off modal */}
+      {offerOpen && (
+        <>
+          <div onClick={() => setOfferOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2502 }} />
+          <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 400, maxWidth: "calc(100vw - 40px)", background: "#16110c", border: "1px solid rgba(197,162,85,0.35)", borderRadius: 14, zIndex: 2503, padding: "34px 30px", textAlign: "center" }}>
+            <X size={18} style={{ position: "absolute", top: 14, right: 14, cursor: "pointer", color: "#a3947c" }} onClick={() => setOfferOpen(false)} />
+            {offerState === "done" ? (
+              <>
+                <div style={{ fontSize: 34, marginBottom: 10 }}>🎉</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, color: "#f0e6d2", marginBottom: 10 }}>You're in!</h3>
+                <p style={{ fontSize: 13.5, color: "#a3947c", marginBottom: 18 }}>Use this code at checkout for 10% off your first order:</p>
+                <div style={{ display: "inline-block", padding: "12px 28px", border: "1.5px dashed #c5a255", borderRadius: 8, fontSize: 20, letterSpacing: 3, color: "#e8c97a", fontWeight: 700, marginBottom: 8 }}>WELCOME10</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 10 }}>Welcome Offer</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: "#f0e6d2", marginBottom: 8 }}>Get 10% Off Your First Order</h3>
+                <p style={{ fontSize: 13.5, color: "#a3947c", marginBottom: 20 }}>Join our list for new arrivals, bridal drops & exclusive offers.</p>
+                <input type="email" value={email} onChange={e => { setEmail(e.target.value); if (offerState === "error") setOfferState("form"); }} onKeyDown={e => { if (e.key === "Enter") claimOffer(); }} placeholder="you@example.com"
+                  style={{ width: "100%", height: 46, border: `1px solid ${offerState === "error" ? "#d9534f" : "#2b2218"}`, borderRadius: 6, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#0d0a08", color: "#f0e6d2", marginBottom: 12 }} />
+                {offerState === "error" && <div style={{ fontSize: 12, color: "#e8a0a0", marginBottom: 10 }}>Please enter a valid email.</div>}
+                <button onClick={claimOffer} className="btn-shine" style={{ width: "100%", height: 48, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Claim My 10% Off</button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -1984,40 +2200,194 @@ function ProductCard({ product, navigate, inWishlist, toggleWishlist }) {
 }
 
 /* ─── SHOP PAGE ─── */
+/* ─── SHOP FILTER DATA & HELPERS ─── */
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "Free Size", "Custom"];
+const PRICE_BUCKETS = [
+  { label: "Under $300", test: (p) => p < 300 },
+  { label: "$300 – $450", test: (p) => p >= 300 && p < 450 },
+  { label: "$450 – $600", test: (p) => p >= 450 && p < 600 },
+  { label: "$600+", test: (p) => p >= 600 },
+];
+const COLOR_SWATCHES = [
+  { label: "Red", hex: "#a3182a", match: /\bred\b|banarasi/i },
+  { label: "Maroon", hex: "#5a1020", match: /maroon/i },
+  { label: "Pink", hex: "#d46a8a", match: /pink|blush/i },
+  { label: "Blue", hex: "#1a3aa0", match: /blue|navy|royal/i },
+  { label: "Green", hex: "#1a6a4a", match: /green|teal|emerald|mint/i },
+  { label: "Gold", hex: "#c5a255", match: /gold/i },
+  { label: "Ivory", hex: "#e8dfce", match: /ivory|pearl/i },
+  { label: "Black", hex: "#1a1512", match: /black/i },
+  { label: "Multicolor", hex: "linear-gradient(135deg,#d4466a,#c5a255,#1a6a4a)", match: /multicolor|patchwork/i },
+];
+const FABRIC_OPTS = [
+  { label: "Silk", match: /silk/i },
+  { label: "Velvet", match: /velvet/i },
+  { label: "Georgette", match: /georgette/i },
+  { label: "Brocade", match: /brocade/i },
+  { label: "Banarasi", match: /banarasi/i },
+  { label: "Net", match: /\bnet\b/i },
+];
+const OCCASION_BY_CAT = {
+  Bridal: ["Wedding", "Reception"],
+  Lehengas: ["Wedding", "Sangeet", "Reception"],
+  Sarees: ["Reception", "Festive"],
+  Anarkali: ["Sangeet", "Mehandi", "Festive"],
+  Sharara: ["Sangeet", "Mehandi"],
+  Sherwanis: ["Wedding"],
+};
+const OCCASIONS = ["Wedding", "Reception", "Sangeet", "Mehandi", "Festive"];
+const colorsOf = (p) => COLOR_SWATCHES.filter((c) => c.match.test(p.name || "")).map((c) => c.label);
+const fabricsOf = (p) => FABRIC_OPTS.filter((f) => f.match.test(`${p.desc || ""} ${p.name || ""}`)).map((f) => f.label);
+const occasionsOf = (p) => OCCASION_BY_CAT[p.cat] || ["Festive"];
+const isReadyToShip = (p) => (p.images?.length || 0) > 0;
+
+function FilterSection({ title, open, onToggle, children }) {
+  return (
+    <div style={{ borderBottom: "1px solid #2b2218" }}>
+      <button onClick={onToggle} style={{ width: "100%", padding: "15px 0", background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "'Outfit',sans-serif" }}>
+        <span style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "#f0e6d2", fontWeight: 600 }}>{title}</span>
+        <span style={{ color: "#c5a255", transform: open ? "rotate(90deg)" : "none", transition: "transform .2s", display: "inline-flex" }}><ChevronRight size={15} /></span>
+      </button>
+      {open && <div style={{ paddingBottom: 16, display: "flex", flexDirection: "column", gap: 11 }}>{children}</div>}
+    </div>
+  );
+}
+
+function CheckRow({ label, checked, onChange, swatch }) {
+  return (
+    <div onClick={onChange} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13.5, color: checked ? "#f0e6d2" : "#a3947c" }}>
+      <span style={{ width: 16, height: 16, borderRadius: 3, border: `1.5px solid ${checked ? "#c5a255" : "#3a3026"}`, background: checked ? "#c5a255" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {checked && <Check size={11} color="#1a1208" strokeWidth={3} />}
+      </span>
+      {swatch && <span style={{ width: 15, height: 15, borderRadius: "50%", background: swatch, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />}
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function ShopPage({ navigate, products, filter, setFilter, addToCart, query = "", setQuery, inWishlist, toggleWishlist }) {
   const q = query.trim().toLowerCase();
-  const byCat = filter === "All" ? products : products.filter(p => p.cat === filter);
-  const filtered = q
-    ? byCat.filter(p =>
-        [p.name, p.cat, p.desc, p.badge].filter(Boolean).some(v => v.toLowerCase().includes(q))
-      )
-    : byCat;
+  const [sort, setSort] = useState("trending");
+  const [sel, setSel] = useState({ sizes: [], prices: [], colors: [], occasions: [], fabrics: [], ready: false });
+  const [open, setOpen] = useState({ Size: true, Price: true, Color: true, Occasion: false, Fabric: false });
+  const [drawer, setDrawer] = useState(false);
+
+  const toggle = (key, val) => setSel((s) => ({ ...s, [key]: s[key].includes(val) ? s[key].filter((x) => x !== val) : [...s[key], val] }));
+  const clearAll = () => setSel({ sizes: [], prices: [], colors: [], occasions: [], fabrics: [], ready: false });
+  const activeCount = sel.sizes.length + sel.prices.length + sel.colors.length + sel.occasions.length + sel.fabrics.length + (sel.ready ? 1 : 0);
+
+  const sizes = [...new Set(products.flatMap((p) => p.sizes || []))].sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+  const colors = COLOR_SWATCHES.filter((c) => products.some((p) => c.match.test(p.name || "")));
+  const fabrics = FABRIC_OPTS.filter((f) => products.some((p) => f.match.test(`${p.desc || ""} ${p.name || ""}`)));
+
+  const byCat = filter === "All" ? products : products.filter((p) => p.cat === filter);
+  let list = byCat.filter((p) => !q || [p.name, p.cat, p.desc, p.badge].filter(Boolean).some((v) => v.toLowerCase().includes(q)));
+  list = list.filter((p) => !sel.sizes.length || (p.sizes || []).some((s) => sel.sizes.includes(s)));
+  list = list.filter((p) => !sel.prices.length || sel.prices.some((lbl) => PRICE_BUCKETS.find((b) => b.label === lbl)?.test(p.price)));
+  list = list.filter((p) => !sel.colors.length || colorsOf(p).some((c) => sel.colors.includes(c)));
+  list = list.filter((p) => !sel.occasions.length || occasionsOf(p).some((o) => sel.occasions.includes(o)));
+  list = list.filter((p) => !sel.fabrics.length || fabricsOf(p).some((f) => sel.fabrics.includes(f)));
+  list = list.filter((p) => !sel.ready || isReadyToShip(p));
+
+  const sorted = [...list];
+  if (sort === "best") sorted.sort((a, b) => (b.reviews || 0) - (a.reviews || 0));
+  else if (sort === "new") sorted.sort((a, b) => (b.id || 0) - (a.id || 0));
+  else if (sort === "price-high") sorted.sort((a, b) => b.price - a.price);
+  else if (sort === "price-low") sorted.sort((a, b) => a.price - b.price);
+
   const heading = q ? `Results for “${query.trim()}”` : (filter === "All" ? "All Collections" : filter);
+
+  const sidebarInner = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, color: "#f0e6d2" }}>Filters</span>
+        {activeCount > 0 && <span onClick={clearAll} style={{ fontSize: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Clear all ({activeCount})</span>}
+      </div>
+      <FilterSection title="Size" open={open.Size} onToggle={() => setOpen((o) => ({ ...o, Size: !o.Size }))}>
+        {sizes.map((s) => <CheckRow key={s} label={s} checked={sel.sizes.includes(s)} onChange={() => toggle("sizes", s)} />)}
+      </FilterSection>
+      <FilterSection title="Price" open={open.Price} onToggle={() => setOpen((o) => ({ ...o, Price: !o.Price }))}>
+        {PRICE_BUCKETS.map((b) => <CheckRow key={b.label} label={b.label} checked={sel.prices.includes(b.label)} onChange={() => toggle("prices", b.label)} />)}
+      </FilterSection>
+      <FilterSection title="Color" open={open.Color} onToggle={() => setOpen((o) => ({ ...o, Color: !o.Color }))}>
+        {colors.map((c) => <CheckRow key={c.label} label={c.label} swatch={c.hex} checked={sel.colors.includes(c.label)} onChange={() => toggle("colors", c.label)} />)}
+      </FilterSection>
+      <FilterSection title="Occasion" open={open.Occasion} onToggle={() => setOpen((o) => ({ ...o, Occasion: !o.Occasion }))}>
+        {OCCASIONS.map((oc) => <CheckRow key={oc} label={oc} checked={sel.occasions.includes(oc)} onChange={() => toggle("occasions", oc)} />)}
+      </FilterSection>
+      <FilterSection title="Fabric" open={open.Fabric} onToggle={() => setOpen((o) => ({ ...o, Fabric: !o.Fabric }))}>
+        {fabrics.map((f) => <CheckRow key={f.label} label={f.label} checked={sel.fabrics.includes(f.label)} onChange={() => toggle("fabrics", f.label)} />)}
+      </FilterSection>
+      <div style={{ paddingTop: 16 }}>
+        <CheckRow label="Ready to ship" checked={sel.ready} onChange={() => setSel((s) => ({ ...s, ready: !s.ready }))} />
+      </div>
+    </>
+  );
+
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 32px 80px" }}>
-      <div className="fade-in" style={{ marginBottom: 32 }}>
+      <div className="fade-in" style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: "#a3947c", marginBottom: 8 }}>
           <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span>Shop</span> {filter !== "All" && <>/ <span>{filter}</span></>}
         </div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>{heading}</h1>
-        <p style={{ fontSize: 14, color: "#a3947c" }}>
-          {filtered.length} {filtered.length === 1 ? "piece" : "pieces"} · Handcrafted with love
-          {q && setQuery && <span onClick={() => setQuery("")} style={{ marginLeft: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Clear search</span>}
-        </p>
       </div>
-      <div className="fade-in d1" style={{ display: "flex", gap: 8, marginBottom: 32, flexWrap: "wrap", alignItems: "center" }}>
+
+      {/* category chips */}
+      <div className="fade-in d1" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         <Filter size={16} style={{ color: "#a3947c", marginRight: 8 }} />
-        {CATEGORIES.map(c => (
+        {CATEGORIES.map((c) => (
           <button key={c} onClick={() => setFilter(c)}
             style={{ padding: "8px 18px", borderRadius: 100, border: `1px solid ${c === filter ? "rgba(197,162,85,0.5)" : "#2b2218"}`, background: c === filter ? "#c5a255" : "transparent", color: c === filter ? "#1a1208" : "#a3947c", fontSize: 12, cursor: "pointer", letterSpacing: .5, fontFamily: "'Outfit',sans-serif", transition: "all .3s" }}>
             {c}
           </button>
         ))}
       </div>
-      <div className="fade-in d2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 20 }}>
-        {filtered.map(p => <ProductCard key={p.id} product={p} navigate={navigate} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />)}
+
+      {/* toolbar: count · mobile filter button · sort */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button className="mobile-only" onClick={() => setDrawer(true)} style={{ display: "none", alignItems: "center", gap: 8, padding: "9px 16px", background: "#16110c", border: "1px solid #2b2218", color: "#f0e6d2", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
+            <Filter size={15} /> Filters{activeCount ? ` (${activeCount})` : ""}
+          </button>
+          <span style={{ fontSize: 13, color: "#a3947c" }}>{sorted.length} {sorted.length === 1 ? "piece" : "pieces"}{q && setQuery && <span onClick={() => setQuery("")} style={{ marginLeft: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Clear search</span>}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12.5, color: "#a3947c", letterSpacing: .5, whiteSpace: "nowrap" }}>Sort By</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value)}
+            style={{ height: 40, padding: "0 14px", background: "#16110c", color: "#f0e6d2", border: "1px solid #2b2218", borderRadius: 6, fontSize: 13.5, fontFamily: "'Outfit',sans-serif", cursor: "pointer", outline: "none" }}>
+            <option value="trending">Trending</option>
+            <option value="best">Best selling</option>
+            <option value="new">New</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="price-low">Price: low to high</option>
+          </select>
+        </div>
       </div>
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: "80px 0", color: "#a3947c" }}>{q ? `No pieces match “${query.trim()}”. Try a different search.` : "No products in this category yet. Check back soon!"}</div>}
+
+      {/* layout: filter sidebar + product grid */}
+      <div className="shop-layout" style={{ display: "grid", gridTemplateColumns: "230px 1fr", gap: 32, alignItems: "start" }}>
+        <aside className="shop-sidebar">{sidebarInner}</aside>
+        <div>
+          <div className="fade-in d2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 20 }}>
+            {sorted.map((p) => <ProductCard key={p.id} product={p} navigate={navigate} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />)}
+          </div>
+          {sorted.length === 0 && <div style={{ textAlign: "center", padding: "80px 0", color: "#a3947c" }}>No pieces match these filters.{activeCount > 0 && <> <span onClick={clearAll} style={{ color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Clear filters</span></>}</div>}
+        </div>
+      </div>
+
+      {/* mobile filter drawer */}
+      {drawer && <>
+        <div onClick={() => setDrawer(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 3000 }} />
+        <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: 320, maxWidth: "88vw", background: "#0d0a08", zIndex: 3001, overflowY: "auto", padding: "20px 22px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22 }}>Filters</span>
+            <X size={20} style={{ cursor: "pointer" }} onClick={() => setDrawer(false)} />
+          </div>
+          {sidebarInner}
+          <button onClick={() => setDrawer(false)} style={{ width: "100%", marginTop: 20, height: 48, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 6, fontSize: 13, letterSpacing: 2, textTransform: "uppercase", cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Show {sorted.length} results</button>
+        </div>
+      </>}
     </div>
   );
 }
@@ -2041,6 +2411,45 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
   const [sizeError, setSizeError] = useState(false);
   const [slide, setSlide]       = useState(0);
   useEffect(() => { setSlide(0); }, [product.id]);
+
+  /* image zoom lightbox */
+  const [zoomImg, setZoomImg] = useState(null);
+  const [zoomed, setZoomed] = useState(false);
+  const [zoomOrigin, setZoomOrigin] = useState("50% 50%");
+
+  /* sticky add-to-cart bar — appears once the main CTA scrolls out of view */
+  const [showBar, setShowBar] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowBar(window.scrollY > 560);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /* per-product reviews — stored locally until the backend gets a reviews
+     module; seeded with the product's static count so it never looks empty */
+  const revKey = `cb_reviews_${product.id}`;
+  const [userReviews, setUserReviews] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(revKey) || "[]"); } catch { return []; }
+  });
+  useEffect(() => {
+    try { setUserReviews(JSON.parse(localStorage.getItem(`cb_reviews_${product.id}`) || "[]")); } catch { setUserReviews([]); }
+  }, [product.id]);
+  const [showRevForm, setShowRevForm] = useState(false);
+  const [revForm, setRevForm] = useState({ name: "", rating: 5, title: "", text: "" });
+  const [revError, setRevError] = useState("");
+  const submitReview = () => {
+    if (!revForm.name.trim() || !revForm.text.trim()) { setRevError("Please add your name and review."); return; }
+    const entry = { ...revForm, date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }) };
+    const next = [entry, ...userReviews];
+    setUserReviews(next);
+    try { localStorage.setItem(revKey, JSON.stringify(next)); } catch { /* ignore */ }
+    setShowRevForm(false);
+    setRevForm({ name: "", rating: 5, title: "", text: "" });
+    setRevError("");
+  };
+  const avgRating = userReviews.length
+    ? (userReviews.reduce((s, r) => s + r.rating, 0) / userReviews.length)
+    : product.rating;
 
   /* real, purchasable sizes for this product (each maps to a Medusa variant) */
   const ALL_SIZES = product.sizes?.length ? product.sizes : ["XS","S","M","L","XL","XXL"];
@@ -2123,7 +2532,9 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
                       <div style={{ fontSize: 12, color: "#6e6353", letterSpacing: 1 }}>Coming soon</div>
                     </div>
                   ) : s ? (
-                    <img src={s} alt={`${product.name} view ${i + 1}`} loading={i > 0 ? "lazy" : "eager"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <img src={s} alt={`${product.name} view ${i + 1}`} loading={i > 0 ? "lazy" : "eager"}
+                      onClick={() => { setZoomImg(s); setZoomed(false); }}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }} />
                   ) : null}
 
                   {/* "Contains" chip — first photo slide only */}
@@ -2402,6 +2813,93 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
         </div>
       </div>
 
+      {/* ════════ CUSTOMER REVIEWS ════════ */}
+      <section style={{ maxWidth: 900, margin: "0 auto", padding: "48px 32px 8px", borderTop: "1px solid #2b2218" }}>
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, color: "#f0e6d2", marginBottom: 8 }}>Customer Reviews</h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
+            <span style={{ color: "#e8c97a", letterSpacing: 2, fontSize: 16 }}>{"★".repeat(Math.round(avgRating))}{"☆".repeat(5 - Math.round(avgRating))}</span>
+            <span style={{ fontSize: 13.5, color: "#a3947c" }}>{avgRating.toFixed(1)} · {userReviews.length ? `${userReviews.length} review${userReviews.length > 1 ? "s" : ""}` : "Be the first to review this piece"}</span>
+          </div>
+          {!showRevForm && (
+            <button onClick={() => setShowRevForm(true)} style={{ padding: "11px 26px", background: "#f0e6d2", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 700, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>✏️ Write a Review</button>
+          )}
+        </div>
+
+        {showRevForm && (
+          <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: 22, marginBottom: 28, maxWidth: 560, margin: "0 auto 28px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#f0e6d2" }}>Write a review</span>
+              <X size={16} style={{ cursor: "pointer", color: "#a3947c" }} onClick={() => setShowRevForm(false)} />
+            </div>
+            <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+              {[1,2,3,4,5].map(n => (
+                <span key={n} onClick={() => setRevForm(f => ({ ...f, rating: n }))} style={{ fontSize: 24, cursor: "pointer", color: n <= revForm.rating ? "#e8c97a" : "#3a3026" }}>★</span>
+              ))}
+            </div>
+            <input value={revForm.name} onChange={e => setRevForm(f => ({ ...f, name: e.target.value }))} placeholder="Your name"
+              style={{ width: "100%", height: 44, border: "1px solid #2b2218", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", marginBottom: 10 }} />
+            <input value={revForm.title} onChange={e => setRevForm(f => ({ ...f, title: e.target.value }))} placeholder="Title (optional) — e.g. Beautiful Lehenga!"
+              style={{ width: "100%", height: 44, border: "1px solid #2b2218", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", marginBottom: 10 }} />
+            <textarea value={revForm.text} onChange={e => setRevForm(f => ({ ...f, text: e.target.value }))} placeholder="Share your experience — fit, fabric, the occasion you wore it for…" rows={4}
+              style={{ width: "100%", border: "1px solid #2b2218", borderRadius: 4, padding: "12px 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", resize: "vertical", marginBottom: 10, lineHeight: 1.6 }} />
+            {revError && <div style={{ fontSize: 12, color: "#e8a0a0", marginBottom: 10 }}>{revError}</div>}
+            <button onClick={submitReview} style={{ width: "100%", height: 46, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Submit Review</button>
+          </div>
+        )}
+
+        {userReviews.length > 0 && (
+          <div style={{ maxWidth: 640, margin: "0 auto" }}>
+            {userReviews.map((r, i) => (
+              <div key={i} style={{ borderBottom: "1px solid #2b2218", padding: "18px 0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ color: "#e8c97a", fontSize: 13, letterSpacing: 1.5 }}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                  <span style={{ fontSize: 12, color: "#6e6353" }}>{r.date}</span>
+                </div>
+                {r.title && <div style={{ fontSize: 14.5, fontWeight: 700, color: "#f0e6d2", marginBottom: 5 }}>{r.title}</div>}
+                <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.65, marginBottom: 8 }}>{r.text}</p>
+                <div style={{ fontSize: 12.5, color: "#f0e6d2", fontWeight: 600 }}>{r.name} <span style={{ color: "#3dbd83", fontWeight: 400, marginLeft: 6 }}>✓ Verified</span></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ════════ IMAGE ZOOM LIGHTBOX ════════ */}
+      {zoomImg && (
+        <div onClick={() => { setZoomImg(null); setZoomed(false); }} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(13,10,8,0.96)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <X size={30} style={{ position: "absolute", top: 24, right: 28, cursor: "pointer", color: "#f0e6d2", zIndex: 4001 }} />
+          <img src={zoomImg} alt={product.name}
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              setZoomOrigin(`${((e.clientX - r.left) / r.width * 100).toFixed(1)}% ${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
+              setZoomed(z => !z);
+            }}
+            style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", cursor: zoomed ? "zoom-out" : "zoom-in", transform: zoomed ? "scale(2.4)" : "none", transformOrigin: zoomOrigin, transition: "transform .35s ease" }} />
+          <div style={{ position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)", fontSize: 12, color: "#a3947c", letterSpacing: 1 }}>
+            {zoomed ? "Click to zoom out" : "Click the image to zoom into the embroidery"}
+          </div>
+        </div>
+      )}
+
+      {/* ════════ STICKY ADD-TO-CART BAR ════════ */}
+      {showBar && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 2400, background: "#16110c", borderTop: "1px solid #2b2218", boxShadow: "0 -6px 24px rgba(0,0,0,0.45)", padding: "10px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 44, height: 54, borderRadius: 4, overflow: "hidden", flexShrink: 0, background: product.color }}>
+            {product.images?.[0] && <img src={product.images[0]} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#f0e6d2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.name}</div>
+            <div style={{ fontSize: 12.5, color: "#a3947c" }}>{selectedSize ? `Size ${selectedSize} · ` : ""}${product.price}</div>
+          </div>
+          <button className="btn-shine" onClick={() => { if (!selectedSize) { setSizeError(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; } handleAdd(); }}
+            style={{ height: 46, padding: "0 28px", background: added ? "#3dbd83" : "linear-gradient(135deg,#d4af61,#a8842f)", color: added ? "#fff" : "#1a1208", border: "none", borderRadius: 6, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif", whiteSpace: "nowrap" }}>
+            {added ? "✓ Added" : selectedSize ? "Add to Cart" : "Select Size"}
+          </button>
+        </div>
+      )}
+
       {/* ════════ SIMILAR ITEMS ════════ */}
       <section style={{ maxWidth: 1440, margin: "0 auto", padding: "40px 32px 80px" }}>
         <h2 style={{ fontSize: 22, fontWeight: 600, color: "#f0e6d2", marginBottom: 18 }}>Similar Items</h2>
@@ -2451,8 +2949,20 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
   const [deliveryMethod, setDeliveryMethod] = useState("ship");
   const [placing, setPlacing] = useState(false);
   const [orderError, setOrderError] = useState("");
-  const tax = total * 0.0625;
-  const grandTotal = total + tax;
+  // Promo codes — client-side for now; move server-side with real payments.
+  const PROMOS = { WELCOME10: 0.10 };
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState(null); // { code, pct }
+  const [promoMsg, setPromoMsg] = useState("");
+  const applyPromo = () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    if (PROMOS[code]) { setPromo({ code, pct: PROMOS[code] }); setPromoMsg(""); }
+    else { setPromo(null); setPromoMsg("That code isn't valid."); }
+  };
+  const discount = promo ? total * promo.pct : 0;
+  const tax = (total - discount) * 0.0625;
+  const grandTotal = total - discount + tax;
 
   const handlePlaceOrder = async () => {
     setOrderError("");
@@ -2641,8 +3151,25 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
                 <span>${(item.price * item.qty).toFixed(0)}</span>
               </div>
             ))}
+            {/* Promo code */}
             <div style={{ borderTop: "1px solid #2b2218", paddingTop: 16, marginTop: 16 }}>
+              {promo ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(61,189,131,0.1)", border: "1px solid rgba(61,189,131,0.35)", borderRadius: 6, padding: "10px 12px", marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: "#3dbd83" }}>✓ {promo.code} — {Math.round(promo.pct * 100)}% off</span>
+                  <X size={14} style={{ cursor: "pointer", color: "#a3947c" }} onClick={() => { setPromo(null); setPromoInput(""); }} />
+                </div>
+              ) : (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input value={promoInput} onChange={e => { setPromoInput(e.target.value); setPromoMsg(""); }} onKeyDown={e => { if (e.key === "Enter") applyPromo(); }} placeholder="Promo code"
+                      style={{ flex: 1, height: 42, border: "1px solid #2b2218", borderRadius: 4, padding: "0 12px", fontFamily: "'Outfit',sans-serif", fontSize: 13, outline: "none", background: "#0d0a08", color: "#f0e6d2", textTransform: "uppercase" }} />
+                    <button onClick={applyPromo} style={{ padding: "0 18px", background: "#2b2218", color: "#e8c97a", border: "none", borderRadius: 4, fontSize: 12, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Apply</button>
+                  </div>
+                  {promoMsg && <div style={{ fontSize: 12, color: "#e8a0a0", marginTop: 6 }}>{promoMsg}</div>}
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#a3947c" }}>Subtotal</span><span>${total.toFixed(0)}</span></div>
+              {promo && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#3dbd83" }}>Discount ({promo.code})</span><span style={{ color: "#3dbd83" }}>−${discount.toFixed(2)}</span></div>}
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#a3947c" }}>Shipping</span><span style={{ color: "#3dbd83" }}>Free</span></div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#a3947c" }}>Tax (MA 6.25%)</span><span>${tax.toFixed(2)}</span></div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#a3947c" }}>Alterations</span><span style={{ color: "#3dbd83" }}>Free</span></div>

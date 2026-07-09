@@ -28,3 +28,9 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# local-only assets & backend workspace
+media/
+"Chaubandhi Photos and Videos"/
+Chaubandhi Photos and Videos/
+Kimi_Agent_Medusa v2 Backend Build/
