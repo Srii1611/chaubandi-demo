@@ -226,6 +226,16 @@ export function logoutCustomer() {
   setToken(null);
 }
 
+// Ask Medusa to start a password reset for this email. The backend emits an
+// auth.password_reset event; the email with the reset link goes out once a
+// notification subscriber + SendGrid creds are live.
+export async function requestPasswordReset(email) {
+  return api("/auth/customer/emailpass/reset-password", {
+    method: "POST",
+    body: { identifier: email },
+  });
+}
+
 export async function getCustomer(token = getToken()) {
   if (!token) return null;
   const res = await api("/store/customers/me", { token });
@@ -246,6 +256,40 @@ export async function saveMeasurements(data, token = getToken()) {
   if (!token) throw new Error("auth required");
   const res = await api("/store/measurements", { method: "POST", body: data, token });
   return res.measurement;
+}
+
+// ─── Custom-design inspiration ───
+// Upload inspiration image files (multipart) for a logged-in customer.
+// Returns an array of hosted URLs. Requires a customer token — the backend
+// caps this at 3 images x 10MB and only accepts JPEG/PNG/WebP/HEIC.
+export async function uploadInspirationImages(files, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  const form = new FormData();
+  for (const f of files) form.append("files", f);
+  // Note: don't set Content-Type — the browser adds the multipart boundary.
+  const res = await fetch(`${BASE}/store/uploads`, {
+    method: "POST",
+    headers: {
+      "x-publishable-api-key": PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = JSON.stringify(await res.json()); } catch { /* ignore */ }
+    throw new Error(`Medusa POST /store/uploads → ${res.status} ${detail}`);
+  }
+  const { files: created } = await res.json();
+  return (created || []).map((f) => f.url);
+}
+
+// Create a custom-design inspiration request. Creates a draft order in Medusa
+// (visible in Admin → Orders) carrying the reference image + design specs.
+// Requires image_url and garment_type; requires a logged-in customer.
+export async function createInspirationRequest(payload, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  return api("/store/inspiration", { method: "POST", body: payload, token });
 }
 
 // Link the logged-in customer to their active cart so the order is tied to

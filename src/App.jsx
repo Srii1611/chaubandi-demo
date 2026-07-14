@@ -1313,9 +1313,10 @@ function DesignStudioPage({ navigate }) {
   const [spec, setSpec] = useState({ email: "", garment: "", fabric: "", color: "", embroidery: "", occasion: "", budget: "" });
   const [images, setImages] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [designRef, setDesignRef] = useState("");
 
   const addFiles = (fileList) => {
-    const next = Array.from(fileList || []).map(f => ({ url: URL.createObjectURL(f), name: f.name }));
+    const next = Array.from(fileList || []).map(f => ({ url: URL.createObjectURL(f), name: f.name, file: f }));
     setImages(prev => [...prev, ...next].slice(0, 6));
   };
   const removeImage = (idx) => setImages(prev => prev.filter((_, i) => i !== idx));
@@ -1330,6 +1331,34 @@ function DesignStudioPage({ navigate }) {
       spec.budget && `Budget: ${spec.budget}`,
       images.length ? `Inspiration images: ${images.length} (shared via WhatsApp)` : "",
     ].filter(Boolean);
+    // If the shopper is logged in and gave us at least one image + a garment,
+    // submit a real inspiration request so it lands in Medusa as a draft order
+    // (Admin → Orders) with the reference image(s). Guests fall through to the
+    // WhatsApp/email handoff below. Any failure degrades to that same fallback.
+    let ref = "";
+    const token = medusa.getToken();
+    const files = images.map(im => im.file).filter(Boolean);
+    if (token && files.length && spec.garment) {
+      try {
+        const urls = await medusa.uploadInspirationImages(files.slice(0, 3), token);
+        const extra = urls.slice(1);
+        const res = await medusa.createInspirationRequest({
+          image_url: urls[0],
+          garment_type: spec.garment,
+          fabric: spec.fabric || undefined,
+          color: spec.color || undefined,
+          embroidery: spec.embroidery || undefined,
+          occasion: spec.occasion || undefined,
+          budget: spec.budget || undefined,
+          notes: extra.length ? `Additional reference images:\n${extra.join("\n")}` : undefined,
+        }, token);
+        const displayId = res?.draft_order?.display_id;
+        if (displayId) ref = `CB-DSGN-${displayId}`;
+      } catch (e) {
+        console.warn("[Chaubandi] inspiration request not saved to Medusa (backend offline or not logged in?)", e);
+      }
+    }
+
     // Durable delivery: email the brief to the boutique if the shopper gave an
     // email (so Sushma can reply). WhatsApp remains the instant channel and
     // carries the inspiration photos.
@@ -1350,6 +1379,9 @@ function DesignStudioPage({ navigate }) {
       images.length ? "\nI'll share my inspiration image(s) here in the chat." : "",
     ].filter(Boolean);
     try { window.open(`https://wa.me/18578001282?text=${encodeURIComponent(lines.join("\n"))}`, "_blank"); } catch { /* popup blocked */ }
+    // Show the real Medusa draft-order ref when we created one; otherwise a
+    // cosmetic placeholder for the WhatsApp/email path.
+    setDesignRef(ref || `CB-DSGN-${Math.floor(Math.random() * 9000) + 1000}`);
     setSubmitted(true);
   };
 
@@ -1370,7 +1402,7 @@ function DesignStudioPage({ navigate }) {
           <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 470, margin: "0 auto 8px", lineHeight: 1.8 }}>
             Thank you! Sushma will personally review your custom {spec.garment ? spec.garment.toLowerCase() : "design"} request{spec.occasion ? ` for your ${spec.occasion.toLowerCase()}` : ""} and reach out within 24 hours to discuss fabrics, timeline, and pricing.
           </p>
-          <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Design Ref #CB-DSGN-{Math.floor(Math.random() * 9000) + 1000}</p>
+          <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Design Ref #{designRef}</p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={() => navigate("home")} className="btn-shine" style={{ padding: "14px 36px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>
               Back to Home
