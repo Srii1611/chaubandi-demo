@@ -40,6 +40,29 @@ export async function getRegionId() {
 // Default card gradient, used when a product has no photography yet.
 const DEFAULT_SWATCH = "linear-gradient(140deg,#2a1f2d,#4a2040 60%,#1a1412)";
 
+/**
+ * Rewrite image URLs onto the backend we are actually talking to.
+ *
+ * The seeder stores absolute URLs, so a catalog seeded against
+ * http://localhost:9000 hands out localhost image links that only resolve on
+ * the machine that ran the seed — every other device (a phone on a tunnel, or
+ * the deployed site) gets broken images. Re-pointing here fixes it without
+ * re-seeding, and keeps working when the backend moves to a real domain.
+ */
+function absoluteUrl(url) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url, BASE);
+    const isLoopback = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(parsed.hostname);
+    if (isLoopback && new URL(BASE).hostname !== parsed.hostname) {
+      return `${BASE}${parsed.pathname}${parsed.search}`;
+    }
+    return parsed.href;
+  } catch {
+    return url;
+  }
+}
+
 // Maps a Medusa product into the shape App.jsx expects.
 //
 // Presentation fields come from the seeded metadata contract (see
@@ -58,7 +81,7 @@ function mapProduct(p) {
 
   // Real Medusa images first; fall back to metadata.images for the older
   // hand-curated products that stored local /Products/... paths there.
-  const images = (p.images || []).map((img) => img.url).filter(Boolean);
+  const images = (p.images || []).map((img) => absoluteUrl(img.url)).filter(Boolean);
   const mdImages = Array.isArray(md.images) ? md.images : [];
 
   return {
