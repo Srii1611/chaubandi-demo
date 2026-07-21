@@ -433,6 +433,68 @@ export async function bookAppointment({ requested_date, time_slot, notes }, toke
   return res.appointment;
 }
 
+export async function listMyAppointments(token = getToken()) {
+  if (!token) return [];
+  const res = await api("/store/appointments", { token });
+  return res.appointments || [];
+}
+
+/**
+ * Error thrown when the backend has no Stripe key configured. The booking is
+ * still saved — only the fee can't be taken — so callers should treat this as
+ * "booked, payment to follow" rather than a failure.
+ */
+export class PaymentsNotConfiguredError extends Error {
+  constructor(message) {
+    super(message || "Payments are not configured yet.");
+    this.name = "PaymentsNotConfiguredError";
+    this.code = "payments_not_configured";
+  }
+}
+
+/**
+ * Start the appointment fee payment.
+ * Resolves to either { paid: true, appointment } when the backend captured it
+ * outright, or { clientSecret, paymentIntentId } for the browser to confirm.
+ * Throws PaymentsNotConfiguredError when no Stripe key is set.
+ */
+export async function payAppointmentFee(appointmentId, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  const res = await fetch(`${BASE}/store/appointments/pay`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-publishable-api-key": PUBLISHABLE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ appointment_id: appointmentId }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 503 && data.code === "payments_not_configured") {
+    throw new PaymentsNotConfiguredError(data.message);
+  }
+  if (!res.ok) {
+    throw new Error(data.message || `Payment failed (${res.status})`);
+  }
+  if (data.success) return { paid: true, appointment: data.appointment };
+  return { clientSecret: data.client_secret, paymentIntentId: data.payment_intent_id };
+}
+
+/** Verify a browser-confirmed PaymentIntent and mark the fee paid. */
+export async function confirmAppointmentPayment(appointmentId, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  const res = await api("/store/appointments/pay/confirm", {
+    method: "POST",
+    body: { appointment_id: appointmentId },
+    token,
+  });
+  return res.appointment;
+}
+
+/** The fee shown in the UI, in whole dollars. Mirrors APPOINTMENT_FEE_CENTS. */
+export const APPOINTMENT_FEE_USD = 10;
+
 // Link the logged-in customer to their active cart so the order is tied to
 // their account.
 export async function associateCartCustomer(cartId, token = getToken()) {

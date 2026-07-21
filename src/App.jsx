@@ -532,7 +532,7 @@ export default function App() {
         {page === "wishlist" && <WishlistPage products={products} wishlist={wishlist} toggleWishlist={toggleWishlist} navigate={navigate} />}
         {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} placeOrder={placeOrder} placedOrder={placedOrder} customer={customer} />}
         {page === "account" && <AccountPage customer={customer} onLogin={handleLogin} onRegister={handleRegister} onLogout={handleLogout} navigate={navigate} />}
-        {page === "live" && <LiveVideoPage navigate={navigate} />}
+        {page === "live" && <LiveVideoPage navigate={navigate} customer={customer} />}
         {page === "story" && <StoryPage navigate={navigate} />}
         {page === "contact" && <ContactPage navigate={navigate} />}
         {page === "design" && <DesignStudioPage navigate={navigate} />}
@@ -619,7 +619,7 @@ function FloatingWidgets({ navigate }) {
     ["What are your store hours?", "We're open Tuesday – Sunday, 10 AM – 7 PM ET at 177 Massachusetts Ave, Arlington, MA."],
     ["Do you offer custom sizing?", "Yes! Every purchase includes free alterations, and made-to-measure is complimentary. Use the Perfect Fit tool to save your measurements."],
     ["How long does shipping take?", "Free US shipping — in-stock pieces ship in 24–48 hours and arrive in 3–5 business days. Custom pieces take 2–4 weeks."],
-    ["Can I book a styling session?", "Absolutely — free video consultations with Sushma via WhatsApp or Zoom. Tap below to book."],
+    ["Can I book a styling session?", "Yes — book a private video call with Sushma. A $10 fee secures your slot; tap below to pick a time."],
   ];
   const goReviews = () => {
     navigate("home");
@@ -2150,7 +2150,7 @@ function FaqSection() {
   const FAQS = [
     { q: "Do you offer custom sizing and alterations?", a: "Yes! Every purchase comes with free custom alterations. If you visit our Arlington boutique, our founder Sushma will personally take your measurements. If you are shopping online, we provide a detailed measurement guide and offer virtual consultations." },
     { q: "How long does shipping take?", a: "We offer free shipping across the USA. In-stock items ship within 24–48 hours and typically arrive within 3-5 business days. Custom orders or pieces requiring heavy alterations generally take 2-4 weeks." },
-    { q: "Can I book a virtual styling appointment?", a: "Absolutely. We offer free video call consultations via WhatsApp or Zoom. Sushma will walk you through our collections, show you fabric details up close, and help you find the perfect outfit for your occasion." },
+    { q: "Can I book a virtual styling appointment?", a: "Absolutely. Book a private video call with Sushma for a $10 booking fee, which secures your time slot. She will walk you through our collections, show you fabric details up close, and help you find the perfect outfit for your occasion." },
     { q: "Do you design custom bridal wear?", a: "Yes, we specialize in handcrafted bridal lehengas and sherwanis. We can customize colors, embroidery patterns, and silhouettes to match your wedding theme perfectly. Please book a consultation at least 3-4 months before your wedding date." },
   ];
 
@@ -3220,10 +3220,324 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
 }
 
 /* ─── LIVE VIDEO SHOPPING PAGE ─── */
-function LiveVideoPage({ navigate }) {
+/* ─── APPOINTMENT BOOKING (calendar → slot → $10 fee) ───
+   Availability and slots come from the backend, which is configured for
+   Fridays by default (APPOINTMENT_DAYS). Booking requires a customer account
+   because the appointment is attached to it; guests are prompted to sign in.
+
+   The $10 fee is taken via Stripe. When the backend has no Stripe key it
+   answers 503 payments_not_configured — the booking is still saved, so we tell
+   the customer their slot is held and Sushma will follow up, rather than
+   pretending the booking failed. */
+function AppointmentBooking({ navigate, customer }) {
+  const today = new Date();
+  const [month, setMonth] = useState(
+    `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`
+  );
+  const [days, setDays] = useState([]);
+  const [timezone, setTimezone] = useState("America/New_York");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  // Loading is derived from "which month/date have we actually loaded?" rather
+  // than a flag set at the top of the effect — the effect only ever sets state
+  // once its request has resolved.
+  const [loadedMonth, setLoadedMonth] = useState(null);
+  const [loadedSlotDate, setLoadedSlotDate] = useState(null);
+  const loadingDays = loadedMonth !== month;
+  const loadingSlots = !!selectedDate && loadedSlotDate !== selectedDate;
+  const [notes, setNotes] = useState("");
+  const [stage, setStage] = useState("idle"); // idle|booking|paying|done|error
+  const [result, setResult] = useState(null); // { appointment, paid, awaitingPayment }
+  const [error, setError] = useState("");
+
+  const guest = !customer;
+
+  // Month availability — which days can be booked at all.
+  useEffect(() => {
+    let cancelled = false;
+    medusa
+      .getAppointmentAvailability(month)
+      .then((d) => {
+        if (cancelled) return;
+        setDays(d.days || []);
+        if (d.timezone) setTimezone(d.timezone);
+      })
+      .catch(() => { if (!cancelled) setDays([]); })
+      .finally(() => { if (!cancelled) setLoadedMonth(month); });
+    return () => { cancelled = true; };
+  }, [month]);
+
+  // Times for the chosen day.
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedDate) return;
+    medusa
+      .getAppointmentSlots(selectedDate, 1)
+      .then((all) => {
+        if (cancelled) return;
+        setSlots((all || []).filter((s) => s.date === selectedDate));
+      })
+      .catch(() => { if (!cancelled) setSlots([]); })
+      .finally(() => { if (!cancelled) setLoadedSlotDate(selectedDate); });
+    return () => { cancelled = true; };
+  }, [selectedDate]);
+
+  // Selection is cleared by the events that invalidate it, not by an effect.
+  const shiftMonth = (delta) => {
+    const [y, m] = month.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    setMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+    setSelectedDate("");
+    setSelectedSlot("");
+    setSlots([]);
+  };
+
+  const pickDate = (date) => {
+    setSelectedDate(date);
+    setSelectedSlot("");
+    setSlots([]);
+  };
+
+  const monthLabel = (() => {
+    const [y, m] = month.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", {
+      month: "long", year: "numeric", timeZone: "UTC",
+    });
+  })();
+
+  // Blank cells so the 1st lands under the right weekday.
+  const leadingBlanks = (() => {
+    const [y, m] = month.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  })();
+
+  const prettyDate = (iso) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
+    });
+
+  const prettyTime = (hhmm) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h >= 12 ? "PM" : "AM";
+    const hour = h % 12 === 0 ? 12 : h % 12;
+    return `${hour}:${String(m).padStart(2, "0")} ${suffix}`;
+  };
+
+  const book = async () => {
+    if (guest) { navigate("account"); return; }
+    if (!selectedDate || !selectedSlot) { setError("Please choose a date and a time."); return; }
+    setError("");
+    setStage("booking");
+
+    let appointment;
+    try {
+      appointment = await medusa.bookAppointment({
+        requested_date: selectedDate,
+        time_slot: selectedSlot,
+        notes: notes || undefined,
+      });
+    } catch {
+      setStage("error");
+      setError("We couldn't hold that slot. Please pick another time or try again.");
+      return;
+    }
+
+    // Slot is held from here on: any payment problem below still leaves a
+    // real booking, so we never tell the customer it failed outright.
+    setStage("paying");
+    try {
+      const pay = await medusa.payAppointmentFee(appointment.id);
+      if (pay.paid) {
+        setResult({ appointment, paid: true });
+      } else if (pay.clientSecret) {
+        // Card entry runs in Stripe's own iframe; we never touch card details.
+        const stripe = await loadStripe();
+        if (!stripe) {
+          setResult({ appointment, awaitingPayment: true });
+        } else {
+          const confirmed = await stripe.confirmPayment({
+            clientSecret: pay.clientSecret,
+            confirmParams: { return_url: window.location.href },
+            redirect: "if_required",
+          });
+          if (confirmed.error) {
+            setResult({ appointment, awaitingPayment: true, payError: confirmed.error.message });
+          } else {
+            await medusa.confirmAppointmentPayment(appointment.id).catch(() => {});
+            setResult({ appointment, paid: true });
+          }
+        }
+      } else {
+        setResult({ appointment, awaitingPayment: true });
+      }
+    } catch (e) {
+      // No Stripe key yet, or the payment call failed — the slot is still held.
+      setResult({
+        appointment,
+        awaitingPayment: true,
+        unconfigured: e instanceof medusa.PaymentsNotConfiguredError,
+      });
+    }
+    setStage("done");
+  };
+
+  if (stage === "done" && result) {
+    return (
+      <div style={{ textAlign: "center", padding: "34px 0" }}>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#d4af61,#a8842f)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <Check size={28} color="#1a1208" strokeWidth={2.5} />
+        </div>
+        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, marginBottom: 10, color: "#f0e6d2" }}>
+          {result.paid ? "Your Session Is Booked" : "Your Slot Is Held"}
+        </h3>
+        <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.75, maxWidth: 420, margin: "0 auto 14px" }}>
+          {prettyDate(selectedDate)} at {prettyTime(selectedSlot)} ({timezone.replace("_", " ")}).
+        </p>
+        {result.paid ? (
+          <p style={{ fontSize: 13, color: "#3dbd83", marginBottom: 20 }}>
+            ${medusa.APPOINTMENT_FEE_USD} booking fee paid. Sushma will confirm the call details by email.
+          </p>
+        ) : (
+          <p style={{ fontSize: 13, color: "#e8c97a", lineHeight: 1.7, maxWidth: 440, margin: "0 auto 20px" }}>
+            We haven&rsquo;t taken the ${medusa.APPOINTMENT_FEE_USD} booking fee yet — Sushma will send you a secure payment link to confirm your session.
+            {result.payError ? ` (${result.payError})` : ""}
+          </p>
+        )}
+        <button onClick={() => navigate("account")} style={{ padding: "12px 30px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
+          View My Appointments
+        </button>
+      </div>
+    );
+  }
+
+  const cellBase = {
+    aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center",
+    borderRadius: 6, fontSize: 13, fontFamily: "'Outfit',sans-serif",
+  };
+
+  return (
+    <div>
+      {/* month nav */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <button onClick={() => shiftMonth(-1)} aria-label="Previous month"
+          style={{ width: 34, height: 34, borderRadius: 6, background: "transparent", border: "1px solid #2b2218", color: "#a3947c", cursor: "pointer" }}>‹</button>
+        <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, color: "#f0e6d2" }}>{monthLabel}</span>
+        <button onClick={() => shiftMonth(1)} aria-label="Next month"
+          style={{ width: 34, height: 34, borderRadius: 6, background: "transparent", border: "1px solid #2b2218", color: "#a3947c", cursor: "pointer" }}>›</button>
+      </div>
+
+      {/* calendar */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6, marginBottom: 8 }}>
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <div key={i} style={{ ...cellBase, aspectRatio: "auto", height: 24, color: "#6e6353", fontSize: 11 }}>{d}</div>
+        ))}
+        {Array.from({ length: leadingBlanks }).map((_, i) => <div key={`b${i}`} />)}
+        {days.map((d) => {
+          const active = d.date === selectedDate;
+          const dayNum = Number(d.date.slice(-2));
+          return (
+            <button key={d.date} disabled={!d.available} onClick={() => pickDate(d.date)}
+              title={d.available ? `${d.slots_available} slots available` : "Not available"}
+              style={{
+                ...cellBase,
+                border: `1px solid ${active ? "#c5a255" : d.available ? "#3a3026" : "transparent"}`,
+                background: active ? "#c5a255" : d.available ? "#16110c" : "transparent",
+                color: active ? "#1a1208" : d.available ? "#f0e6d2" : "#4a4238",
+                cursor: d.available ? "pointer" : "default",
+                fontWeight: active ? 700 : 400,
+              }}>
+              {dayNum}
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 11.5, color: "#6e6353", marginBottom: 22 }}>
+        {loadingDays ? "Loading availability…" : `Available dates are highlighted · times shown in ${timezone.replace("_", " ")}`}
+      </p>
+
+      {/* slots */}
+      {selectedDate && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 12, letterSpacing: 1, color: "#a3947c", textTransform: "uppercase", marginBottom: 10 }}>
+            {prettyDate(selectedDate)}
+          </div>
+          {loadingSlots ? (
+            <p style={{ fontSize: 13, color: "#a3947c" }}>Loading times…</p>
+          ) : slots.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#a3947c" }}>No times left on this date — please pick another.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))", gap: 8 }}>
+              {slots.map((s) => {
+                const active = s.time_slot === selectedSlot;
+                return (
+                  <button key={s.time_slot} disabled={!s.available} onClick={() => setSelectedSlot(s.time_slot)}
+                    style={{
+                      height: 40, borderRadius: 6, fontSize: 12.5, fontFamily: "'Outfit',sans-serif",
+                      border: `1px solid ${active ? "#c5a255" : s.available ? "#3a3026" : "#241c14"}`,
+                      background: active ? "#c5a255" : "transparent",
+                      color: active ? "#1a1208" : s.available ? "#f0e6d2" : "#4a4238",
+                      cursor: s.available ? "pointer" : "default",
+                      textDecoration: s.available ? "none" : "line-through",
+                    }}>
+                    {prettyTime(s.time_slot)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 18 }}>
+        <label style={{ fontSize: 11, letterSpacing: 1, color: "#a3947c", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+          What would you like to shop for? <span style={{ textTransform: "none", color: "#6e6353" }}>(optional)</span>
+        </label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+          placeholder="Bridal lehenga for a December wedding, budget around $900…"
+          style={{ width: "100%", border: "1px solid #2b2218", borderRadius: 4, padding: "12px 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", resize: "vertical", lineHeight: 1.6 }} />
+      </div>
+
+      {error && <div style={{ fontSize: 12.5, color: "#e8a0a0", marginBottom: 12 }}>{error}</div>}
+
+      <button className="btn-shine" onClick={book} disabled={stage === "booking" || stage === "paying"}
+        style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, cursor: stage === "booking" || stage === "paying" ? "default" : "pointer", opacity: stage === "booking" || stage === "paying" ? .6 : 1, fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
+        {stage === "booking" ? "Holding your slot…"
+          : stage === "paying" ? "Processing payment…"
+          : guest ? "Sign In To Book"
+          : `Book Session · $${medusa.APPOINTMENT_FEE_USD}`}
+      </button>
+      <p style={{ fontSize: 11, color: "#6e6353", textAlign: "center", marginTop: 12, lineHeight: 1.6 }}>
+        {guest
+          ? "You'll need an account so we can attach the session to your profile."
+          : `A $${medusa.APPOINTMENT_FEE_USD} fee secures your slot. Card details are handled by Stripe — we never see them.`}
+      </p>
+    </div>
+  );
+}
+
+/* Stripe.js is loaded on demand from Stripe's CDN (their terms require it be
+   served from there, not bundled). Returns null if it can't be loaded or no
+   publishable key is set, in which case the caller falls back to "we'll send
+   you a payment link". */
+let _stripePromise = null;
+function loadStripe() {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  if (!key) return Promise.resolve(null);
+  if (_stripePromise) return _stripePromise;
+  _stripePromise = new Promise((resolve) => {
+    if (window.Stripe) { resolve(window.Stripe(key)); return; }
+    const s = document.createElement("script");
+    s.src = "https://js.stripe.com/v3/";
+    s.onload = () => resolve(window.Stripe ? window.Stripe(key) : null);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+  return _stripePromise;
+}
+
+function LiveVideoPage({ navigate, customer }) {
   const [openFaq, setOpenFaq] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", country: "USA", date: "", time: "", app: "WhatsApp", occasion: "", notes: "" });
-  const [submitted, setSubmitted] = useState(false);
 
   const STEPS = [
     { num: "1", title: "Book Your Call", desc: "Fill the form or WhatsApp Sushma directly. Choose a date and time that works for you." },
@@ -3240,7 +3554,7 @@ function LiveVideoPage({ navigate }) {
   ];
 
   const FAQS = [
-    { q: "Is the video shopping session free?", a: "Yes, completely free. No obligation to purchase. We believe in earning your trust first." },
+    { q: "How much does a video shopping session cost?", a: "Booking a session costs $10, which secures your time slot. There is no obligation to purchase anything on the call." },
     { q: "How long does a session take?", a: "Typically 20–30 minutes, but we take as long as you need. Bridal sessions can go up to 60 minutes." },
     { q: "Which platforms do you support?", a: "WhatsApp Video Call, Zoom, Google Meet, and FaceTime. We use whatever works best for you." },
     { q: "Can I shop for bridal wear via video?", a: "Absolutely. Our bridal sessions are among the most popular. Sushma will walk you through every detail of the collection and help you build your complete bridal look." },
@@ -3256,14 +3570,6 @@ function LiveVideoPage({ navigate }) {
     { label: "Sherwanis", color: "linear-gradient(160deg,#0c0a09,#2a2420)", img: "" },
   ];
 
-  const handleSubmit = () => {
-    const msg = `Hi Sushma! I'd like to book a Live Video Shopping session.%0AName: ${form.name}%0AEmail: ${form.email}%0APhone: ${form.phone}%0ADate: ${form.date}%0ATime: ${form.time}%0APlatform: ${form.app}%0AOccasion: ${form.occasion}%0ANotes: ${form.notes}`;
-    window.open(`https://wa.me/18578001282?text=${msg}`, "_blank");
-    setSubmitted(true);
-  };
-
-  const inputStyle = { width: "100%", height: 44, border: "1px solid #2b2218", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13, outline: "none", background: "#16110c", color: "#f0e6d2" };
-  const labelStyle = { fontSize: 11, letterSpacing: 1, color: "#a3947c", display: "block", marginBottom: 5, textTransform: "uppercase" };
 
   return (
     <div className="fade-in">
@@ -3273,7 +3579,7 @@ function LiveVideoPage({ navigate }) {
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,106,58,.18)", border: "1px solid rgba(42,106,58,.4)", borderRadius: 100, padding: "6px 18px", marginBottom: 24 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3dbd83", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
-            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Free · No Obligation</span>
+            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>$10 Booking Fee · No Obligation To Buy</span>
           </div>
           <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(38px,5vw,68px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1, marginBottom: 16 }}>
             Shop Chaubandi<br /><em style={{ color: "#c5a255" }}>Live. From Anywhere.</em>
@@ -3327,61 +3633,12 @@ function LiveVideoPage({ navigate }) {
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 56, alignItems: "start" }} className="mobile-stack">
 
           {/* Form */}
+          {/* Booking: real calendar + slot picker + $10 fee */}
           <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: "40px 36px" }}>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Free · No Commitment</div>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>${medusa.APPOINTMENT_FEE_USD} Booking Fee</div>
             <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, marginBottom: 6 }}>Book Your Private<br />Video Shopping Call</h2>
-            <p style={{ fontSize: 12, color: "#a3947c", marginBottom: 28, lineHeight: 1.6 }}>Fill in your details and Sushma will confirm your slot via WhatsApp within a few hours.</p>
-
-            {submitted ? (
-              <div style={{ textAlign: "center", padding: "40px 0" }}>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
-                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, marginBottom: 8 }}>Request Sent!</h3>
-                <p style={{ fontSize: 13, color: "#a3947c" }}>Sushma will confirm your slot on WhatsApp soon.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Full Name *</label><input style={inputStyle} placeholder="Your name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Email *</label><input style={inputStyle} placeholder="you@email.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Mobile Number *</label><input style={inputStyle} placeholder="+1 (xxx) xxx-xxxx" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Country</label>
-                    <select style={{...inputStyle}} value={form.country} onChange={e => setForm({...form, country: e.target.value})}>
-                      {["USA","Canada","UK","Australia","India","Other"].map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Preferred Date</label><input type="date" style={inputStyle} value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Preferred Time (EST)</label>
-                    <select style={inputStyle} value={form.time} onChange={e => setForm({...form, time: e.target.value})}>
-                      <option value="">Select Time</option>
-                      {["10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM","6:00 PM","7:00 PM"].map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div><label style={labelStyle}>Preferred Video Call App</label>
-                  <select style={inputStyle} value={form.app} onChange={e => setForm({...form, app: e.target.value})}>
-                    {["WhatsApp","Zoom","Google Meet","FaceTime"].map(a => <option key={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div><label style={labelStyle}>What do you want to shop?</label>
-                  <select style={inputStyle} value={form.occasion} onChange={e => setForm({...form, occasion: e.target.value})}>
-                    <option value="">Select occasion / category</option>
-                    {["Bridal Lehenga","Wedding Guest Outfit","Saree","Sherwani / Men's Wear","Sangeet / Mehandi Outfit","Reception Gown","Kids Wear","General Browsing"].map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div><label style={labelStyle}>Anything else? (optional)</label>
-                  <textarea style={{...inputStyle, height: 80, padding: "10px 14px", resize: "none"}} placeholder="Budget, colors, specific occasions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-                </div>
-                <button className="btn-shine" onClick={handleSubmit}
-                  style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4, marginTop: 4 }}>
-                  Submit & Open WhatsApp
-                </button>
-                <p style={{ fontSize: 10, color: "#6e6353", textAlign: "center", letterSpacing: .3 }}>100% private · No fees · No commitment</p>
-              </div>
-            )}
+            <p style={{ fontSize: 12, color: "#a3947c", marginBottom: 28, lineHeight: 1.6 }}>Pick a date and time below. A ${medusa.APPOINTMENT_FEE_USD} fee secures your slot, and Sushma will confirm the call details by email.</p>
+            <AppointmentBooking navigate={navigate} customer={customer} />
           </div>
 
           {/* Contact Side */}
