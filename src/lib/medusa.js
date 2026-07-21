@@ -337,3 +337,48 @@ export async function placeOrder(cartId, form, deliveryMethod) {
   }
   return res.order;
 }
+
+
+// ─── Paid video-shopping appointments ───
+// Matches the backend appointments module:
+//   GET  /store/appointments/slots        public availability
+//   POST /store/appointments              customer booking request
+//   POST /store/appointments/pay          starts the $10 Stripe PaymentIntent
+//   POST /store/appointments/pay/confirm  verifies Stripe and marks fee paid
+export async function listAppointmentSlots({ startDate, weeks = 6 } = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (weeks) params.set("weeks", String(weeks));
+  const qs = params.toString();
+  return api(`/store/appointments/slots${qs ? `?${qs}` : ""}`);
+}
+
+export async function createAppointment(payload, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  const res = await api("/store/appointments", { method: "POST", body: payload, token });
+  return res.appointment;
+}
+
+export async function startAppointmentPayment(appointmentId, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  return api("/store/appointments/pay", {
+    method: "POST",
+    body: { appointment_id: appointmentId },
+    token,
+  });
+}
+
+export async function confirmAppointmentPayment(appointmentId, token = getToken()) {
+  if (!token) throw new Error("auth required");
+  return api("/store/appointments/pay/confirm", {
+    method: "POST",
+    body: { appointment_id: appointmentId },
+    token,
+  });
+}
+
+export async function listMyAppointments(token = getToken()) {
+  if (!token) return [];
+  const res = await api("/store/appointments", { token });
+  return res.appointments || [];
+}

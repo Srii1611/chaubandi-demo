@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Heart, Search, X, Plus, Minus, Trash2, ChevronRight, ChevronLeft, User, Filter, Check } from "lucide-react";
 import * as medusa from "./lib/medusa";
+import { loadStripe } from "@stripe/stripe-js";
 
 const PRODUCTS = [
   { id: 1, name: "Multicolor Patchwork Embroidered Lehenga", price: 489, cat: "Lehengas", badge: "New Arrival", color: "linear-gradient(140deg,#2a1f2d,#4a2040 25%,#c5a255 45%,#d4466a 60%,#1a3a2a 80%)", images: ["/Products/Lehenga-Demo/img1.jpg", "/Products/Lehenga-Demo/img2.jpg", "/Products/Lehenga-Demo/img3.jpg"], rating: 4.9, reviews: 47, desc: "Rich multicolor patchwork with geometric and floral motifs, peacock borders, and mirror work. Includes embroidered blouse and black velvet dupatta.", sizes: ["XS","S","M","L","XL","Custom"] },
@@ -478,7 +479,7 @@ export default function App() {
         {page === "wishlist" && <WishlistPage products={products} wishlist={wishlist} toggleWishlist={toggleWishlist} navigate={navigate} />}
         {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} placeOrder={placeOrder} placedOrder={placedOrder} customer={customer} />}
         {page === "account" && <AccountPage customer={customer} onLogin={handleLogin} onRegister={handleRegister} onLogout={handleLogout} navigate={navigate} />}
-        {page === "live" && <LiveVideoPage navigate={navigate} />}
+        {page === "live" && <LiveVideoPage navigate={navigate} customer={customer} />}
         {page === "story" && <StoryPage navigate={navigate} />}
         {page === "contact" && <ContactPage navigate={navigate} />}
         {page === "design" && <DesignStudioPage navigate={navigate} />}
@@ -3045,13 +3046,27 @@ function CheckoutPage({ cart, total, step, setStep, navigate, setCart, orderPlac
 }
 
 /* ─── LIVE VIDEO SHOPPING PAGE ─── */
-function LiveVideoPage({ navigate }) {
+function LiveVideoPage({ navigate, customer }) {
   const [openFaq, setOpenFaq] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", country: "USA", date: "", time: "", app: "WhatsApp", occasion: "", notes: "" });
-  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", occasion: "", notes: "" });
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+  const [slotsError, setSlotsError] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [step, setStep] = useState("details"); // details | payment | done
+  const [appointment, setAppointment] = useState(null);
+  const [payment, setPayment] = useState(null);
+  const [paidAppointment, setPaidAppointment] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const stripeRef = useRef(null);
+  const cardElementRef = useRef(null);
+  const cardHostRef = useRef(null);
 
   const STEPS = [
-    { num: "1", title: "Book Your Call", desc: "Fill the form or WhatsApp Sushma directly. Choose a date and time that works for you." },
+    { num: "1", title: "Reserve Your Call", desc: "Choose a real slot from the boutique calendar and reserve it with the $10 booking fee." },
     { num: "2", title: "Meet Your Stylist", desc: "Join the video call. Sushma will show you pieces live — fabrics, embroidery, colors, all up close." },
     { num: "3", title: "Customise & Pay", desc: "Pick your outfit, choose alterations, confirm measurements. Pay securely in your currency." },
     { num: "4", title: "Worldwide Delivery", desc: "We pack and ship your order within 24–48 hours. Free shipping across the USA." },
@@ -3065,11 +3080,11 @@ function LiveVideoPage({ navigate }) {
   ];
 
   const FAQS = [
-    { q: "Is the video shopping session free?", a: "Yes, completely free. No obligation to purchase. We believe in earning your trust first." },
+    { q: "How much does a video shopping session cost?", a: "A private session costs $10 to reserve your slot. This confirms your time with Sushma and keeps the calendar fair for every customer." },
     { q: "How long does a session take?", a: "Typically 20–30 minutes, but we take as long as you need. Bridal sessions can go up to 60 minutes." },
     { q: "Which platforms do you support?", a: "WhatsApp Video Call, Zoom, Google Meet, and FaceTime. We use whatever works best for you." },
     { q: "Can I shop for bridal wear via video?", a: "Absolutely. Our bridal sessions are among the most popular. Sushma will walk you through every detail of the collection and help you build your complete bridal look." },
-    { q: "How do I pay after the session?", a: "We'll send you a secure payment link via WhatsApp or email. We accept all major cards, PayPal, and Zelle." },
+    { q: "How do I pay after the session?", a: "The $10 reservation is paid securely online when you book. For outfits, we'll send you a secure payment link via WhatsApp or email. We accept all major cards, PayPal, and Zelle." },
     { q: "Can I bring family members to the call?", a: "Yes! Many customers invite their mom, sister, or friends to join the call. The more the merrier." },
     { q: "What if I need alterations?", a: "All purchases come with free alterations. We'll guide you through taking your measurements during or after the call." },
     { q: "Do you ship internationally?", a: "Yes. We ship across the USA (free shipping) and internationally. Sushma will confirm shipping costs for your country during the session." },
@@ -3081,14 +3096,215 @@ function LiveVideoPage({ navigate }) {
     { label: "Sherwanis", color: "linear-gradient(160deg,#0c0a09,#2a2420)", img: "" },
   ];
 
-  const handleSubmit = () => {
-    const msg = `Hi Sushma! I'd like to book a Live Video Shopping session.%0AName: ${form.name}%0AEmail: ${form.email}%0APhone: ${form.phone}%0ADate: ${form.date}%0ATime: ${form.time}%0APlatform: ${form.app}%0AOccasion: ${form.occasion}%0ANotes: ${form.notes}`;
-    window.open(`https://wa.me/18578001282?text=${msg}`, "_blank");
-    setSubmitted(true);
-  };
-
   const inputStyle = { width: "100%", height: 44, border: "1px solid #2b2218", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13, outline: "none", background: "#16110c", color: "#f0e6d2" };
   const labelStyle = { fontSize: 11, letterSpacing: 1, color: "#a3947c", display: "block", marginBottom: 5, textTransform: "uppercase" };
+
+  const moneyFee = () => "$10.00";
+  const fmtDate = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const fmtTime = (timeStr) => {
+    const [h, m] = timeStr.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  };
+
+  // Prefill from the signed-in Medusa customer.
+  useEffect(() => {
+    if (!customer) return;
+    const fullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim();
+    setForm((f) => ({
+      ...f,
+      name: fullName || f.name,
+      email: customer.email || f.email,
+      phone: customer.phone || f.phone,
+    }));
+  }, [customer]);
+
+  // Load real availability from the backend appointment module.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setSlotsLoading(true);
+      setSlotsError("");
+      try {
+        const startDate = new Date().toISOString().slice(0, 10);
+        const res = await medusa.listAppointmentSlots({ startDate, weeks: 6 });
+        if (!cancelled) setSlots(res?.slots || []);
+      } catch (e) {
+        console.warn("[Chaubandi] appointment slots unavailable", e);
+        if (!cancelled) setSlotsError("We couldn't load live appointment slots. Please try again in a moment or WhatsApp Sushma directly.");
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const slotsByDate = slots.reduce((acc, slot) => {
+    if (!acc[slot.date]) acc[slot.date] = [];
+    acc[slot.date].push(slot);
+    return acc;
+  }, {});
+  const dates = Object.keys(slotsByDate).sort();
+  const firstBookableDate = dates.find((d) => (slotsByDate[d] || []).some((s) => s.available)) || dates[0] || "";
+
+  useEffect(() => {
+    if (!selectedDate && firstBookableDate) setSelectedDate(firstBookableDate);
+  }, [selectedDate, firstBookableDate]);
+
+  const daySlots = (slotsByDate[selectedDate] || []).slice().sort((a, b) => a.time_slot.localeCompare(b.time_slot));
+  const chooseDate = (date) => {
+    setSelectedDate(date);
+    const firstOpen = (slotsByDate[date] || []).find((s) => s.available);
+    setSelectedSlot(firstOpen?.time_slot || "");
+  };
+
+  const resetBooking = () => {
+    setStep("details");
+    setAppointment(null);
+    setPayment(null);
+    setPaidAppointment(null);
+    setError("");
+    setSelectedSlot((slotsByDate[selectedDate] || []).find((s) => s.available)?.time_slot || "");
+  };
+
+  const beginPayment = async () => {
+    setError("");
+    if (!customer) {
+      setError("Please sign in to reserve a paid video session.");
+      return;
+    }
+    if (!selectedDate || !selectedSlot) {
+      setError("Please choose a date and time slot.");
+      return;
+    }
+    if (!form.name.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(form.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!form.phone.trim()) {
+      setError("Please enter your mobile number so Sushma can confirm your call.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const notes = [
+        "Paid live video shopping session",
+        `Name: ${form.name}`,
+        `Email: ${form.email}`,
+        `Phone: ${form.phone}`,
+        form.occasion ? `Shopping for: ${form.occasion}` : "",
+        form.notes ? `Notes: ${form.notes}` : "",
+      ].filter(Boolean).join("\n");
+
+      const created = await medusa.createAppointment({
+        requested_date: selectedDate,
+        time_slot: selectedSlot,
+        notes,
+      });
+      const started = await medusa.startAppointmentPayment(created.id);
+      if (!started?.client_secret) {
+        throw new Error(started?.message || "Stripe did not return a client secret.");
+      }
+      setAppointment(created);
+      setPayment(started);
+      setStep("payment");
+    } catch (e) {
+      console.error("[Chaubandi] booking/payment start failed", e);
+      const msg = String(e?.message || "");
+      if (/503|Payments are not configured|STRIPE_API_KEY/i.test(msg)) {
+        setError("The $10 booking payment system is not configured yet. Please WhatsApp Sushma and we'll reserve your slot manually.");
+      } else if (/auth required|401/i.test(msg)) {
+        setError("Please sign in again to reserve your appointment.");
+      } else {
+        setError("We couldn't start your booking. Please try again or WhatsApp Sushma directly.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Mount a real Stripe card element only after the backend returns a client_secret.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (step !== "payment" || !payment?.client_secret) return;
+      const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey) {
+        setError("Stripe is missing VITE_STRIPE_PUBLISHABLE_KEY in the frontend .env.");
+        return;
+      }
+      const stripe = await loadStripe(publishableKey);
+      if (!stripe || !mounted) return;
+      stripeRef.current = stripe;
+      const elements = stripe.elements();
+      const card = elements.create("card", {
+        style: {
+          base: {
+            color: "#f0e6d2",
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: "14px",
+            iconColor: "#c5a255",
+            "::placeholder": { color: "#6e6353" },
+          },
+          invalid: { color: "#e8a0a0", iconColor: "#e8a0a0" },
+        },
+      });
+      cardElementRef.current = card;
+      if (cardHostRef.current) card.mount(cardHostRef.current);
+    })();
+    return () => {
+      mounted = false;
+      try { cardElementRef.current?.unmount(); } catch { /* ignore */ }
+      cardElementRef.current = null;
+    };
+  }, [step, payment?.client_secret]);
+
+  const confirmPaidBooking = async () => {
+    setError("");
+    if (!appointment || !payment?.client_secret) {
+      setError("Your booking payment session expired. Please go back and try again.");
+      return;
+    }
+    if (!stripeRef.current || !cardElementRef.current) {
+      setError("The secure card form is still loading. Please wait a moment and try again.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await stripeRef.current.confirmCardPayment(payment.client_secret, {
+        payment_method: {
+          card: cardElementRef.current,
+          billing_details: {
+            name: form.name,
+            email: form.email,
+            phone: form.phone,
+          },
+        },
+      });
+      if (result.error) throw new Error(result.error.message || "Your card was declined.");
+
+      const confirmed = await medusa.confirmAppointmentPayment(appointment.id);
+      setPaidAppointment(confirmed?.appointment || appointment);
+      setStep("done");
+    } catch (e) {
+      console.error("[Chaubandi] appointment payment confirmation failed", e);
+      setError(e?.message || "Payment could not be completed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const whatsappFallback = () => {
+    const msg = `Hi Sushma! I'd like to book a paid Live Video Shopping session.%0AName: ${encodeURIComponent(form.name)}%0AEmail: ${encodeURIComponent(form.email)}%0APhone: ${encodeURIComponent(form.phone)}%0ADate: ${selectedDate || ""}%0ATime: ${selectedSlot || ""}%0AOccasion: ${encodeURIComponent(form.occasion)}%0ANotes: ${encodeURIComponent(form.notes)}`;
+    window.open(`https://wa.me/18578001282?text=${msg}`, "_blank");
+  };
 
   return (
     <div className="fade-in">
@@ -3098,16 +3314,16 @@ function LiveVideoPage({ navigate }) {
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,106,58,.18)", border: "1px solid rgba(42,106,58,.4)", borderRadius: 100, padding: "6px 18px", marginBottom: 24 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3dbd83", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
-            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Free · No Obligation</span>
+            <span style={{ fontSize: 11, letterSpacing: 2, color: "#7acca0", textTransform: "uppercase" }}>Private Session · {moneyFee()} Booking Fee</span>
           </div>
           <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(38px,5vw,68px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1, marginBottom: 16 }}>
             Shop Chaubandi<br /><em style={{ color: "#c5a255" }}>Live. From Anywhere.</em>
           </h1>
           <p style={{ fontSize: 15, color: "rgba(240,235,228,.7)", lineHeight: 1.8, maxWidth: 540, margin: "0 auto 16px" }}>
-            A free one-on-one video session with Sushma. See every fabric, every embroidery detail, every drape — live on your screen. Then we ship it to your door.
+            Reserve a private one-on-one video session with Sushma. See every fabric, every embroidery detail, every drape — live on your screen. Then we ship it to your door.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 32, marginBottom: 36, flexWrap: "wrap" }}>
-            {["Personal Stylist on Every Call", "See Real Stock Live", "Ships Worldwide", "Free Alterations Included"].map(t => (
+            {["Personal Stylist on Every Call", "Real Boutique Calendar", "Ships Worldwide", "Free Alterations Included"].map(t => (
               <div key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(240,235,228,.55)", letterSpacing: .5 }}>
                 <span style={{ color: "#c5a255" }}>✓</span> {t}
               </div>
@@ -3116,14 +3332,14 @@ function LiveVideoPage({ navigate }) {
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn-shine" onClick={() => document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" })}
               style={{ padding: "15px 40px", background: "#c5a255", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
-              Book Free Session
+              Reserve Session — $10
             </button>
             <button onClick={() => window.open("https://wa.me/18578001282", "_blank")}
               style={{ padding: "15px 40px", background: "transparent", color: "#f0e6d2", border: "1px solid rgba(240,235,228,.3)", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 2 }}>
               WhatsApp Sushma
             </button>
           </div>
-          <div style={{ marginTop: 20, fontSize: 12, color: "rgba(240,235,228,.3)" }}>📞 857-800-1282 · Available Tue–Sun</div>
+          <div style={{ marginTop: 20, fontSize: 12, color: "rgba(240,235,228,.3)" }}>📞 857-800-1282 · Available on configured boutique days</div>
         </div>
       </div>
 
@@ -3151,60 +3367,141 @@ function LiveVideoPage({ navigate }) {
       <div id="booking-form" style={{ background: "#0d0a08", padding: "80px 32px", borderBottom: "1px solid #2b2218" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 56, alignItems: "start" }} className="mobile-stack">
 
-          {/* Form */}
+          {/* Booking panel */}
           <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: "40px 36px" }}>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Free · No Commitment</div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, marginBottom: 6 }}>Book Your Private<br />Video Shopping Call</h2>
-            <p style={{ fontSize: 12, color: "#a3947c", marginBottom: 28, lineHeight: 1.6 }}>Fill in your details and Sushma will confirm your slot via WhatsApp within a few hours.</p>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 8 }}>Live Calendar · Secure Stripe Payment</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, marginBottom: 6 }}>Reserve Your Private<br />Video Shopping Call</h2>
+            <p style={{ fontSize: 12, color: "#a3947c", marginBottom: 28, lineHeight: 1.6 }}>Pick a real boutique slot, sign in, and pay the $10 reservation fee securely. Sushma confirms every session personally.</p>
 
-            {submitted ? (
+            {!customer ? (
+              <div style={{ textAlign: "center", padding: "42px 24px", border: "1px dashed rgba(197,162,85,.35)", borderRadius: 8, background: "#0d0a08" }}>
+                <div style={{ fontSize: 34, marginBottom: 12 }}>🔐</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, marginBottom: 8 }}>Sign In to Reserve Your Slot</h3>
+                <p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.7, marginBottom: 20 }}>Paid appointments are attached to your Chaubandi account so your booking, payment, and follow-up stay in one place.</p>
+                <button className="btn-shine" onClick={() => navigate("account")} style={{ padding: "13px 30px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", borderRadius: 4 }}>
+                  Sign In / Create Account
+                </button>
+                <div onClick={whatsappFallback} style={{ marginTop: 16, fontSize: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Prefer WhatsApp? Message Sushma directly</div>
+              </div>
+            ) : step === "done" ? (
               <div style={{ textAlign: "center", padding: "40px 0" }}>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
-                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, marginBottom: 8 }}>Request Sent!</h3>
-                <p style={{ fontSize: 13, color: "#a3947c" }}>Sushma will confirm your slot on WhatsApp soon.</p>
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#3dbd83", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Check size={32} color="#fff" />
+                </div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, marginBottom: 8 }}>Booking Reserved</h3>
+                <p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.8, maxWidth: 420, margin: "0 auto 18px" }}>
+                  Your {moneyFee()} booking fee is paid. Sushma will confirm the final call details personally.
+                </p>
+                <div style={{ background: "#0d0a08", border: "1px solid #2b2218", borderRadius: 8, padding: 20, maxWidth: 420, margin: "0 auto 22px", textAlign: "left" }}>
+                  <div style={{ fontSize: 12, color: "#a3947c", marginBottom: 6 }}>Appointment</div>
+                  <div style={{ fontSize: 15, color: "#f0e6d2", marginBottom: 4 }}>{fmtDate((paidAppointment?.requested_date || selectedDate || "").toString().slice(0, 10))} · {fmtTime(paidAppointment?.time_slot || selectedSlot)}</div>
+                  <div style={{ fontSize: 12, color: "#3dbd83" }}>Fee paid · Status: {paidAppointment?.status || "requested"}</div>
+                </div>
+                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                  <button onClick={() => navigate("shop")} className="btn-shine" style={{ padding: "13px 28px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", borderRadius: 4 }}>Browse Collection</button>
+                  <button onClick={resetBooking} style={{ padding: "13px 28px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,.4)", cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", borderRadius: 4 }}>Book Another Slot</button>
+                </div>
+              </div>
+            ) : step === "payment" ? (
+              <div>
+                <div style={{ background: "#0d0a08", border: "1px solid #2b2218", borderRadius: 8, padding: 18, marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", textTransform: "uppercase", marginBottom: 5 }}>Reserved Slot</div>
+                      <div style={{ fontSize: 15, color: "#f0e6d2" }}>{fmtDate(selectedDate)} · {fmtTime(selectedSlot)}</div>
+                      <div style={{ fontSize: 12, color: "#a3947c", marginTop: 4 }}>{form.name} · {form.email}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 11, letterSpacing: 2, color: "#a3947c", textTransform: "uppercase", marginBottom: 5 }}>Booking Fee</div>
+                      <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, color: "#e8c97a" }}>{moneyFee()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <label style={labelStyle}>Secure Card Payment</label>
+                <div ref={cardHostRef} style={{ height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "13px 14px 0", background: "#16110c", marginBottom: 16 }} />
+                <p style={{ fontSize: 11, color: "#6e6353", lineHeight: 1.6, marginBottom: 18 }}>Your card is processed by Stripe. Chaubandi never stores your card number.</p>
+
+                {error && <div style={{ fontSize: 13, color: "#e8a0a0", background: "rgba(120,30,30,0.25)", border: "1px solid rgba(180,60,60,0.4)", borderRadius: 6, padding: "12px 14px", marginBottom: 16 }}>{error}</div>}
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button disabled={busy} onClick={() => setStep("details")} style={{ flex: 1, height: 52, border: "1px solid #2b2218", background: "#16110c", color: "#f0e6d2", cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: busy ? .6 : 1 }}>← Back</button>
+                  <button className="btn-shine" disabled={busy} onClick={confirmPaidBooking} style={{ flex: 2, height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: busy ? "wait" : "pointer", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: busy ? .75 : 1 }}>
+                    {busy ? "Processing…" : `Pay ${moneyFee()} & Reserve`}
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {slotsLoading ? (
+                  <div style={{ padding: "24px", textAlign: "center", color: "#a3947c", border: "1px dashed #2b2218", borderRadius: 8 }}>Loading live boutique availability…</div>
+                ) : slotsError ? (
+                  <div style={{ padding: "18px", border: "1px solid rgba(180,60,60,.4)", background: "rgba(120,30,30,.22)", borderRadius: 8, color: "#e8a0a0", fontSize: 13, lineHeight: 1.6 }}>
+                    {slotsError}
+                    <div onClick={whatsappFallback} style={{ marginTop: 10, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Book through WhatsApp instead</div>
+                  </div>
+                ) : dates.length === 0 ? (
+                  <div style={{ padding: "18px", border: "1px solid #2b2218", borderRadius: 8, color: "#a3947c", fontSize: 13 }}>No appointment slots are currently configured. Please WhatsApp Sushma to arrange a time.</div>
+                ) : (
+                  <>
+                    <div>
+                      <label style={labelStyle}>Choose a Date</label>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {dates.map((d) => {
+                          const openCount = (slotsByDate[d] || []).filter((s) => s.available).length;
+                          const active = d === selectedDate;
+                          return (
+                            <button key={d} onClick={() => chooseDate(d)} disabled={openCount === 0}
+                              style={{ padding: "10px 14px", borderRadius: 6, border: `1px solid ${active ? "#c5a255" : "#2b2218"}`, background: active ? "#c5a255" : "#0d0a08", color: active ? "#1a1208" : openCount ? "#f0e6d2" : "#6e6353", cursor: openCount ? "pointer" : "not-allowed", fontFamily: "'Outfit',sans-serif", fontSize: 12 }}>
+                              {fmtDate(d)}<span style={{ display: "block", fontSize: 10, opacity: .75 }}>{openCount ? `${openCount} open` : "full"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Choose a Time</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))", gap: 8 }}>
+                        {daySlots.map((s) => {
+                          const active = selectedSlot === s.time_slot;
+                          return (
+                            <button key={`${s.date}_${s.time_slot}`} disabled={!s.available} onClick={() => setSelectedSlot(s.time_slot)}
+                              style={{ height: 40, borderRadius: 4, border: `1px solid ${active ? "#c5a255" : "#2b2218"}`, background: active ? "#c5a255" : s.available ? "#0d0a08" : "#16110c", color: active ? "#1a1208" : s.available ? "#f0e6d2" : "#6e6353", cursor: s.available ? "pointer" : "not-allowed", fontFamily: "'Outfit',sans-serif", fontSize: 12, textDecoration: s.available ? "none" : "line-through" }}>
+                              {fmtTime(s.time_slot)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Full Name *</label><input style={inputStyle} placeholder="Your name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Email *</label><input style={inputStyle} placeholder="you@email.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+                  <div><label style={labelStyle}>Full Name *</label><input style={inputStyle} placeholder="Your name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+                  <div><label style={labelStyle}>Email *</label><input style={inputStyle} placeholder="you@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Mobile Number *</label><input style={inputStyle} placeholder="+1 (xxx) xxx-xxxx" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Country</label>
-                    <select style={{...inputStyle}} value={form.country} onChange={e => setForm({...form, country: e.target.value})}>
-                      {["USA","Canada","UK","Australia","India","Other"].map(c => <option key={c}>{c}</option>)}
+                  <div><label style={labelStyle}>Mobile Number *</label><input style={inputStyle} placeholder="+1 (xxx) xxx-xxxx" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+                  <div><label style={labelStyle}>What do you want to shop?</label>
+                    <select style={inputStyle} value={form.occasion} onChange={e => setForm({ ...form, occasion: e.target.value })}>
+                      <option value="">Select occasion / category</option>
+                      {["Bridal Lehenga", "Wedding Guest Outfit", "Saree", "Sherwani / Men's Wear", "Sangeet / Mehandi Outfit", "Reception Gown", "Kids Wear", "General Browsing"].map(o => <option key={o}>{o}</option>)}
                     </select>
                   </div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div><label style={labelStyle}>Preferred Date</label><input type="date" style={inputStyle} value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
-                  <div><label style={labelStyle}>Preferred Time (EST)</label>
-                    <select style={inputStyle} value={form.time} onChange={e => setForm({...form, time: e.target.value})}>
-                      <option value="">Select Time</option>
-                      {["10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM","6:00 PM","7:00 PM"].map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div><label style={labelStyle}>Preferred Video Call App</label>
-                  <select style={inputStyle} value={form.app} onChange={e => setForm({...form, app: e.target.value})}>
-                    {["WhatsApp","Zoom","Google Meet","FaceTime"].map(a => <option key={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div><label style={labelStyle}>What do you want to shop?</label>
-                  <select style={inputStyle} value={form.occasion} onChange={e => setForm({...form, occasion: e.target.value})}>
-                    <option value="">Select occasion / category</option>
-                    {["Bridal Lehenga","Wedding Guest Outfit","Saree","Sherwani / Men's Wear","Sangeet / Mehandi Outfit","Reception Gown","Kids Wear","General Browsing"].map(o => <option key={o}>{o}</option>)}
-                  </select>
                 </div>
                 <div><label style={labelStyle}>Anything else? (optional)</label>
-                  <textarea style={{...inputStyle, height: 80, padding: "10px 14px", resize: "none"}} placeholder="Budget, colors, specific occasions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                  <textarea style={{ ...inputStyle, height: 80, padding: "10px 14px", resize: "none" }} placeholder="Budget, colors, specific occasions..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                 </div>
-                <button className="btn-shine" onClick={handleSubmit}
-                  style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4, marginTop: 4 }}>
-                  Submit & Open WhatsApp
+
+                {error && <div style={{ fontSize: 13, color: "#e8a0a0", background: "rgba(120,30,30,0.25)", border: "1px solid rgba(180,60,60,0.4)", borderRadius: 6, padding: "12px 14px" }}>{error}</div>}
+
+                <button className="btn-shine" disabled={busy || slotsLoading || !!slotsError || dates.length === 0} onClick={beginPayment}
+                  style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: busy ? "wait" : "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif", borderRadius: 4, marginTop: 4, opacity: busy || slotsLoading || !!slotsError || dates.length === 0 ? .65 : 1 }}>
+                  {busy ? "Reserving…" : `Continue to Secure ${moneyFee()} Payment`}
                 </button>
-                <p style={{ fontSize: 10, color: "#6e6353", textAlign: "center", letterSpacing: .3 }}>100% private · No fees · No commitment</p>
+                <p style={{ fontSize: 10, color: "#6e6353", textAlign: "center", letterSpacing: .3 }}>Real slot reservation · Secure Stripe payment · Sushma confirms personally</p>
+                <div onClick={whatsappFallback} style={{ textAlign: "center", fontSize: 12, color: "#e8c97a", cursor: "pointer", textDecoration: "underline" }}>Need help? Book through WhatsApp instead</div>
               </div>
             )}
           </div>
@@ -3317,12 +3614,12 @@ function LiveVideoPage({ navigate }) {
             Your Perfect Outfit<br /><em style={{ color: "#c5a255" }}>Is One Call Away</em>
           </h2>
           <p style={{ fontSize: 14, color: "rgba(240,235,228,.55)", marginBottom: 36, lineHeight: 1.7 }}>
-            Free session. No pressure. Just Sushma, your style, and a full boutique on your screen.
+            Reserve your private session, meet Sushma live, and shop the full boutique from anywhere.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn-shine" onClick={() => document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" })}
               style={{ padding: "15px 40px", background: "#c5a255", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
-              Book Free Session
+              Reserve Session — $10
             </button>
             <button onClick={() => window.open("https://wa.me/18578001282","_blank")}
               style={{ padding: "15px 40px", background: "transparent", color: "#f0e6d2", border: "1px solid rgba(240,235,228,.3)", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>
