@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Heart, Search, X, Plus, Minus, Trash2, ChevronRight, ChevronLeft, User, Filter, Check } from "lucide-react";
 import * as medusa from "./lib/medusa";
+import { searchByImage } from './lib/imageSearch.js';
 
 const PRODUCTS = [
   { id: 1, name: "Multicolor Patchwork Embroidered Lehenga", price: 489, cat: "Lehengas", badge: "New Arrival", color: "linear-gradient(140deg,#2a1f2d,#4a2040 25%,#c5a255 45%,#d4466a 60%,#1a3a2a 80%)", images: ["/Products/Lehenga-Demo/img1.jpg", "/Products/Lehenga-Demo/img2.jpg", "/Products/Lehenga-Demo/img3.jpg"], rating: 4.9, reviews: 47, desc: "Rich multicolor patchwork with geometric and floral motifs, peacock borders, and mirror work. Includes embroidered blouse and black velvet dupatta.", sizes: ["XS","S","M","L","XL","Custom"] },
@@ -128,6 +129,7 @@ export default function App() {
   const [infoTopic, setInfoTopic] = useState("privacy");
   const [searchQuery, setSearchQuery] = useState("");
   const [customer, setCustomer] = useState(null);
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
   const [wishlist, setWishlist] = useState(() => {
     try { return JSON.parse(localStorage.getItem("cb_wishlist") || "[]"); } catch { return []; }
   });
@@ -325,6 +327,7 @@ export default function App() {
           .mobile-stack { flex-direction: column !important; }
           .mobile-grid { grid-template-columns: 1fr !important; gap: 24px !important; padding: 32px 16px !important; }
           .mobile-hide { display: none !important; }
+          .img-search-modal { grid-template-columns: 1fr !important; }
           .mobile-hero-text { font-size: 40px !important; }
           .mobile-only { display: inline-flex !important; }
           .shop-sidebar { display: none !important; }
@@ -418,7 +421,7 @@ export default function App() {
               style={{ width: "100%", height: 52, paddingLeft: 48, paddingRight: 16, border: "1.5px solid #2b2218", borderRight: "none", borderRadius: "8px 0 0 8px", fontSize: 14.5, color: "#f0e6d2", background: "#16110c", outline: "none", fontFamily: "'Outfit',sans-serif" }}
               onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = "#2b2218"} />
           </div>
-          <button className="btn-shine mobile-hide" style={{ height: 52, padding: "0 24px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: "0 8px 8px 0", fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 9, whiteSpace: "nowrap" }}>
+          <button className="btn-shine mobile-hide" onClick={() => setImageSearchOpen(true)} style={{ height: 52, padding: "0 24px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: "0 8px 8px 0", fontSize: 14.5, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit',sans-serif", display: "flex", alignItems: "center", gap: 9, whiteSpace: "nowrap" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
             Image Search
           </button>
@@ -517,6 +520,9 @@ export default function App() {
           )}
         </div>
       </>}
+
+      <ImageSearchModal open={imageSearchOpen} onClose={() => setImageSearchOpen(false)}
+        products={products} navigate={navigate} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />
 
       {/* Floating widgets: chat bubble, reviews tab, 10%-off tab */}
       <FloatingWidgets navigate={navigate} />
@@ -2258,6 +2264,171 @@ function HomePage({ navigate, products, setShopFilter }) {
 }
 
 /* ─── PRODUCT CARD ─── */
+/* ─── IMAGE SEARCH MODAL ───
+   Drop, paste or upload a photo and we surface the closest pieces in the
+   catalog. Matching happens entirely on the shopper's device — the photo is
+   never uploaded anywhere — so we can say so plainly in the UI.
+
+   Two ranking methods, chosen automatically by searchByImage: visual
+   similarity once catalog embeddings have been generated, colour + garment
+   matching until then. The heading tells the shopper which one ran rather
+   than implying more precision than we have. */
+function ImageSearchModal({ open, onClose, products, navigate, inWishlist, toggleWishlist }) {
+  const [preview, setPreview] = useState(null);   // { url, name }
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState(null);   // { method, colorName, colorRgb, results }
+  const [error, setError] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  const reset = () => {
+    setPreview((p) => { if (p) URL.revokeObjectURL(p.url); return null; });
+    setOutcome(null);
+    setError("");
+    setBusy(false);
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  const runSearch = async (file) => {
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { setError("That doesn't look like an image file."); return; }
+    setError("");
+    setBusy(true);
+    setOutcome(null);
+    setPreview((prev) => { if (prev) URL.revokeObjectURL(prev.url); return { url: URL.createObjectURL(file), name: file.name }; });
+    try {
+      const res = await searchByImage(file, products, { limit: 12 });
+      setOutcome(res);
+      if (!res.results.length) setError("We couldn't find a close match. Try a photo where the outfit fills more of the frame.");
+    } catch {
+      setError("Sorry, we couldn't read that image. Please try another.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Paste straight from the clipboard, which is how most people arrive with a
+  // screenshot of something they liked.
+  useEffect(() => {
+    if (!open) return;
+    const onPaste = (e) => {
+      const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+      if (item) runSearch(item.getAsFile());
+    };
+    const onKey = (e) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("paste", onPaste);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("paste", onPaste);
+      window.removeEventListener("keydown", onKey);
+    };
+  });
+
+  if (!open) return null;
+
+  const methodLabel = outcome?.method === "visual"
+    ? "Visually similar pieces"
+    : outcome
+      ? `Pieces in ${outcome.colorName?.toLowerCase()} and similar shades`
+      : "";
+
+  return (
+    <div onClick={handleClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(8,6,4,0.82)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} className="fade-in img-search-modal"
+        style={{ background: "#0d0a08", border: "1px solid #2b2218", borderRadius: 12, width: "100%", maxWidth: 1060, maxHeight: "88vh", display: "grid", gridTemplateColumns: "340px 1fr", overflow: "hidden" }}>
+
+        {/* ── Left: upload ── */}
+        <div style={{ borderRight: "1px solid #2b2218", padding: "26px 24px", overflowY: "auto" }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 400, color: "#f0e6d2", marginBottom: 18, textAlign: "center" }}>Image Search</h2>
+
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); runSearch(e.dataTransfer.files?.[0]); }}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, minHeight: 300, border: `1.5px dashed ${dragging ? "#c5a255" : "#2b2218"}`, borderRadius: 10, background: dragging ? "#171009" : "#16110c", cursor: "pointer", padding: 18, textAlign: "center", transition: "border-color .2s, background .2s" }}>
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => runSearch(e.target.files?.[0])} />
+            {preview ? (
+              <div style={{ position: "relative", width: "100%" }}>
+                <img src={preview.url} alt="Your reference" style={{ width: "100%", maxHeight: 300, objectFit: "contain", display: "block", borderRadius: 6 }} />
+              </div>
+            ) : (
+              <>
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#1f1812", border: "1px solid rgba(197,162,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c5a255" strokeWidth="1.6"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                </div>
+                <div style={{ fontSize: 14, color: "#f0e6d2", fontWeight: 500 }}>Drop your image here</div>
+                <div style={{ fontSize: 12, color: "#6e6353", lineHeight: 1.6 }}>or paste it with Ctrl/Cmd + V</div>
+              </>
+            )}
+          </label>
+
+          <label style={{ display: "block", marginTop: 14 }}>
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => runSearch(e.target.files?.[0])} />
+            <span style={{ display: "block", textAlign: "center", padding: "12px 20px", border: "1px solid rgba(197,162,85,0.5)", borderRadius: 4, color: "#e8c97a", fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
+              {preview ? "Try another image" : "Upload a file"}
+            </span>
+          </label>
+
+          {outcome?.method === "color" && outcome.colorRgb && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, fontSize: 12.5, color: "#a3947c" }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, background: `rgb(${outcome.colorRgb.join(",")})`, border: "1px solid rgba(255,255,255,.2)" }} />
+              Closest shade: {outcome.colorName}
+            </div>
+          )}
+
+          <p style={{ fontSize: 11, color: "#6e6353", lineHeight: 1.65, marginTop: 18 }}>
+            Your photo is matched on this device and never uploaded to us.
+          </p>
+        </div>
+
+        {/* ── Right: results ── */}
+        <div style={{ padding: "26px 26px 30px", overflowY: "auto", position: "relative" }}>
+          <button onClick={handleClose} aria-label="Close image search"
+            style={{ position: "absolute", top: 18, right: 20, width: 32, height: 32, borderRadius: "50%", background: "transparent", border: "1px solid #2b2218", color: "#a3947c", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={15} />
+          </button>
+
+          <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 400, color: "#f0e6d2", marginBottom: 6 }}>
+            {outcome ? methodLabel : "Search result"}
+          </h3>
+          <p style={{ fontSize: 12.5, color: "#6e6353", marginBottom: 20, maxWidth: 560, lineHeight: 1.6 }}>
+            {busy ? "Looking through the collection…"
+              : outcome?.method === "visual" ? "Ranked by visual similarity to your photo."
+              : outcome ? "Matched on colour and garment type. Tell us more on WhatsApp and Sushma will find the exact piece."
+              : "Drop in a screenshot or photo of a look you love and we'll find the closest pieces we carry."}
+          </p>
+
+          {error && <div style={{ fontSize: 13, color: "#e8a0a0", marginBottom: 16 }}>{error}</div>}
+
+          {busy && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#a3947c", fontSize: 13 }}>
+              <span style={{ width: 16, height: 16, border: "2px solid rgba(197,162,85,.3)", borderTopColor: "#c5a255", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+              Matching…
+            </div>
+          )}
+
+          {!busy && outcome?.results?.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 18 }}>
+              {outcome.results.map(({ product }) => (
+                <div key={product.id} onClick={handleClose}>
+                  <ProductCard product={product} navigate={navigate} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!busy && !outcome && !error && (
+            <div style={{ border: "1px dashed #2b2218", borderRadius: 10, padding: "48px 24px", textAlign: "center", color: "#4a4238", fontSize: 13 }}>
+              Your matches will appear here.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductCard({ product, navigate, inWishlist, toggleWishlist }) {
   const saved = inWishlist ? inWishlist(product.id) : false;
   return (
