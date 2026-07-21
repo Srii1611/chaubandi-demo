@@ -17,28 +17,70 @@ const PRODUCTS = [
   { id: 12, name: "Pastel Mint Sharara Set", price: 339, cat: "Sharara", color: "linear-gradient(140deg,#3a6a5a,#5a9a8a 50%,#3a6a5a)", images: [], rating: 4.6, reviews: 22, desc: "Light and breezy mint sharara with delicate sequin scatter. Perfect for summer celebrations.", sizes: ["S","M","L","XL"] },
 ];
 
-const CATEGORIES = ["All", "Lehengas", "Sarees", "Sherwanis", "Bridal", "Anarkali", "Sharara"];
+/* ─── Catalog taxonomy ───
+   The 10 canonical category handles are defined by the backend and fetched at
+   runtime (see medusa.listCategories). This list is the fallback used before
+   that resolves, or if the backend is unreachable — it must stay in sync with
+   the backend seeder's CATEGORY_CONFIG.
+   Filtering is by *handle*, never by display name. */
+const FALLBACK_CATEGORIES = [
+  { handle: "lehengas", name: "Lehengas" },
+  { handle: "sarees", name: "Sarees" },
+  { handle: "wedding-dresses", name: "Wedding Dresses" },
+  { handle: "salwars", name: "Salwar Kameez" },
+  { handle: "suits", name: "Suits & Anarkalis" },
+  { handle: "blouses", name: "Blouses" },
+  { handle: "kids-wear", name: "Kids Wear" },
+  { handle: "accessories", name: "Accessories" },
+  { handle: "shoes", name: "Shoes & Boots" },
+  { handle: "jewellery", name: "Jewellery" },
+];
+
+/* The hand-curated products predate the canonical taxonomy and carry a display
+   name in metadata.cat instead of a handle. Map them onto the closest canonical
+   category so they still appear under a filter. */
+const LEGACY_CAT_TO_HANDLE = {
+  Lehengas: "lehengas",
+  Sarees: "sarees",
+  Bridal: "wedding-dresses",
+  Anarkali: "suits",
+  Sharara: "suits",
+  Sherwanis: "suits",
+};
+
+/** Canonical category handle for any product, legacy or seeded. */
+const categoryOf = (p) => p.category || LEGACY_CAT_TO_HANDLE[p.cat] || null;
+
+/* Occasion collections, keyed by the handles the backend seeds. */
+const OCCASION_LABELS = {
+  bridal: "Bridal",
+  "wedding-guest": "Wedding Guest",
+  "sangeet-mehendi": "Sangeet & Mehendi",
+  festive: "Festive",
+  party: "Party",
+  everyday: "Everyday",
+};
 
 const CATEGORY_STRIP = [
-  { label: "Best Seller",     filter: "All",       image: "/images/cat-bestseller.png",  color: "linear-gradient(145deg,#b8860b,#d4a843 55%,#8b6308)" },
-  { label: "Wedding Dresses", filter: "Bridal",    image: "/images/cat-wedding.png",     color: "linear-gradient(145deg,#3a0818,#7a2040 55%,#3a0818)" },
-  { label: "Lehenga",         filter: "Lehengas",  image: "/images/cat-lehenga.png",     color: "linear-gradient(145deg,#3a1830,#6a2858 55%,#3a1830)" },
-  { label: "Saree",           filter: "Sarees",    image: "/images/cat-saree.png",       color: "linear-gradient(145deg,#6a3a3a,#a05858 55%,#5a2828)" },
-  { label: "Men Clothing",    filter: "Sherwanis", image: "/images/cat-men.png",         color: "linear-gradient(145deg,#1a1412,#322824 55%,#1a1412)" },
-  { label: "Indo-Western",    filter: "All",       image: "/images/cat-indo.png",        color: "linear-gradient(145deg,#1a2060,#303880 55%,#121848)" },
-  { label: "Nepali Suits",    filter: "All",       image: "/images/cat-nepali.png",      color: "linear-gradient(145deg,#1a3828,#2a5840 55%,#122818)" },
-  { label: "Sharara",         filter: "Sharara",   image: "/images/cat-sharara.png",     color: "linear-gradient(145deg,#0a3a1a,#1a5a30 55%,#082810)" },
-  { label: "Anarkali",        filter: "Anarkali",  image: "/images/cat-anarkali.png",    color: "linear-gradient(145deg,#3a2a10,#5e4020 55%,#281a08)" },
-  { label: "Jewellery",       filter: "All",       image: "/images/cat-jewelry.jpeg",     color: "linear-gradient(145deg,#5a3808,#9a6818 55%,#3a2204)" },
-  { label: "Kids",            filter: "All",       image: "/images/cat-kids.png",        color: "linear-gradient(145deg,#2a1a5a,#4a3290 55%,#1a1040)" },
-  { label: "Plus Size",       filter: "All",       image: "/images/cat-plussize.png",    color: "linear-gradient(145deg,#5a1a3a,#8a2a60 55%,#380e28)" },
+  { label: "Best Seller",     filter: "all",       image: "/images/cat-bestseller.png",  color: "linear-gradient(145deg,#b8860b,#d4a843 55%,#8b6308)" },
+  { label: "Wedding Dresses", filter: "wedding-dresses",    image: "/images/cat-wedding.png",     color: "linear-gradient(145deg,#3a0818,#7a2040 55%,#3a0818)" },
+  { label: "Lehenga",         filter: "lehengas",  image: "/images/cat-lehenga.png",     color: "linear-gradient(145deg,#3a1830,#6a2858 55%,#3a1830)" },
+  { label: "Saree",           filter: "sarees",    image: "/images/cat-saree.png",       color: "linear-gradient(145deg,#6a3a3a,#a05858 55%,#5a2828)" },
+  { label: "Men Clothing",    filter: "suits", image: "/images/cat-men.png",         color: "linear-gradient(145deg,#1a1412,#322824 55%,#1a1412)" },
+  { label: "Indo-Western",    filter: "all",       image: "/images/cat-indo.png",        color: "linear-gradient(145deg,#1a2060,#303880 55%,#121848)" },
+  { label: "Nepali Suits",    filter: "all",       image: "/images/cat-nepali.png",      color: "linear-gradient(145deg,#1a3828,#2a5840 55%,#122818)" },
+  { label: "Sharara",         filter: "suits",   image: "/images/cat-sharara.png",     color: "linear-gradient(145deg,#0a3a1a,#1a5a30 55%,#082810)" },
+  { label: "Anarkali",        filter: "suits",  image: "/images/cat-anarkali.png",    color: "linear-gradient(145deg,#3a2a10,#5e4020 55%,#281a08)" },
+  { label: "Jewellery",       filter: "jewellery",       image: "/images/cat-jewelry.jpeg",     color: "linear-gradient(145deg,#5a3808,#9a6818 55%,#3a2204)" },
+  { label: "Kids",            filter: "kids-wear",       image: "/images/cat-kids.png",        color: "linear-gradient(145deg,#2a1a5a,#4a3290 55%,#1a1040)" },
+  { label: "Plus Size",       filter: "all",       image: "/images/cat-plussize.png",    color: "linear-gradient(145deg,#5a1a3a,#8a2a60 55%,#380e28)" },
 ];
 
 const HERO_SLIDES = [
   {
     id: 1, tag: "Summer 2026 · New In", headline: "New Arrivals", sub: "Summer Collection",
     body: "Fresh styles just landed — shop our latest Indian & Western fusion pieces.",
-    cta: "Shop Now", action: "shop", filter: "All",
+    cta: "Shop Now", action: "shop", filter: "all",
     image: "/images/hero-summer.png", 
     bg: "linear-gradient(135deg,#1a1412 0%,#3a2008 20%,#6a3808 45%,#a06818 65%,#1a1412 100%)",
     accent: "#c5a255",
@@ -46,7 +88,7 @@ const HERO_SLIDES = [
   {
     id: 2, tag: "Bridal 2026", headline: "Bridal Collection", sub: "Handcrafted Elegance",
     body: "Every piece crafted by hand. Zardozi, pearls & lehenga sets for your perfect day.",
-    cta: "Explore Bridal", action: "shop", filter: "Bridal",
+    cta: "Explore Bridal", action: "shop", filter: "wedding-dresses",
     image: "/images/hero-bridal.png", 
     bg: "linear-gradient(135deg,#100408 0%,#3a0c1e 25%,#6a1830 50%,#8b2c3a 70%,#100408 100%)",
     accent: "#e8b4bc",
@@ -54,7 +96,7 @@ const HERO_SLIDES = [
   {
     id: 3, tag: "The Festive Edit", headline: "Turn Heads", sub: "Guest & Party Wear",
     body: "Stunning Indo-Western gowns and lehengas for Sangeets, Receptions, and celebrations.",
-    cta: "Shop Party Wear", action: "shop", filter: "All",
+    cta: "Shop Party Wear", action: "shop", filter: "all",
     image: "/images/hero-promise.png", 
     bg: "linear-gradient(135deg,#061410 0%,#0c3020 25%,#1a5a38 50%,#2a7050 70%,#061410 100%)",
     accent: "#7dd4b0",
@@ -62,7 +104,7 @@ const HERO_SLIDES = [
   {
     id: 4, tag: "In-Store Experience", headline: "Visit Our Boutique", sub: "Arlington, MA",
     body: "177 Massachusetts Ave · Tue–Sun · Expert styling from Sushma.",
-    cta: "Book Appointment", action: "whatsapp", filter: "All",
+    cta: "Book Appointment", action: "whatsapp", filter: "all",
     // Leaving the image property off this one so it falls back to the blue gradient design
     bg: "linear-gradient(135deg,#080c18 0%,#141e40 25%,#202e60 50%,#2a3a78 70%,#080c18 100%)",
     accent: "#8a9ad4",
@@ -75,9 +117,12 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState(0);
-  const [shopFilter, setShopFilter] = useState("All");
+  const [shopFilter, setShopFilter] = useState("all");
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [products, setProducts] = useState(PRODUCTS);
+  // Canonical categories from the backend; falls back to the static list until
+  // the request resolves (or if the backend is unreachable).
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [cartId, setCartId] = useState(null);   // Medusa cart id; null → offline/local mode
   const [placedOrder, setPlacedOrder] = useState(null);
   const [infoTopic, setInfoTopic] = useState("privacy");
@@ -95,7 +140,7 @@ export default function App() {
   const inWishlist = (id) => wishlist.includes(id);
   const wishlistCount = wishlist.length;
 
-  const runSearch = () => { setShopFilter("All"); navigate("shop"); };
+  const runSearch = () => { setShopFilter("all"); navigate("shop"); };
 
   // Restore a logged-in customer from a saved token on first load.
   useEffect(() => {
@@ -135,6 +180,15 @@ export default function App() {
       try {
         const apiProducts = await medusa.listProducts();
         if (!cancelled && apiProducts.length) setProducts(apiProducts);
+
+        // Categories are non-critical: a failure here just keeps the fallback
+        // list, so it must not abort the cart restore below.
+        medusa
+          .listCategories()
+          .then((cats) => {
+            if (!cancelled && cats.length) setCategories(cats);
+          })
+          .catch(() => {});
 
         const saved = localStorage.getItem("cb_cart_id");
         let cid = saved;
@@ -375,14 +429,14 @@ export default function App() {
       <div className="mobile-hide" style={{ background: "#0d0a08", borderBottom: "1px solid #2b2218", padding: "14px 32px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "center", alignItems: "center", flexWrap: "wrap", gap: "10px 32px" }}>
           {[
-            { label: "New Arrivals", filter: "All" },
-            { label: "Lehengas", filter: "Lehengas" },
-            { label: "Wedding", filter: "Bridal" },
-            { label: "Salwars", filter: "All" },
-            { label: "Suits", filter: "All" },
-            { label: "Blouses", filter: "All" },
-            { label: "Kids Wear", filter: "All" },
-            { label: "Jewellery", filter: "All" },
+            { label: "New Arrivals", filter: "all" },
+            { label: "Lehengas", filter: "lehengas" },
+            { label: "Wedding", filter: "wedding-dresses" },
+            { label: "Salwars", filter: "salwars" },
+            { label: "Suits", filter: "suits" },
+            { label: "Blouses", filter: "blouses" },
+            { label: "Kids Wear", filter: "kids-wear" },
+            { label: "Jewellery", filter: "jewellery" },
           ].map(item => (
             <span key={item.label} onClick={() => { setShopFilter(item.filter); navigate("shop"); }}
               style={{ fontSize: 15.5, color: "#f0e6d2", cursor: "pointer", whiteSpace: "nowrap", transition: "color .2s", borderBottom: "2px solid transparent", paddingBottom: 2 }}
@@ -473,7 +527,7 @@ export default function App() {
       {/* Main Content Area */}
       <main style={{ flex: 1 }}>
         {page === "home" && <HomePage navigate={navigate} products={products} setShopFilter={setShopFilter} addToCart={addToCart} />}
-        {page === "shop" && <ShopPage navigate={navigate} products={products} filter={shopFilter} setFilter={setShopFilter} addToCart={addToCart} query={searchQuery} setQuery={setSearchQuery} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />}
+        {page === "shop" && <ShopPage navigate={navigate} products={products} categories={categories} filter={shopFilter} setFilter={setShopFilter} addToCart={addToCart} query={searchQuery} setQuery={setSearchQuery} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />}
         {page === "product" && selectedProduct && <ProductPage product={selectedProduct} navigate={navigate} addToCart={addToCart} products={products} inWishlist={inWishlist} toggleWishlist={toggleWishlist} />}
         {page === "wishlist" && <WishlistPage products={products} wishlist={wishlist} toggleWishlist={toggleWishlist} navigate={navigate} />}
         {page === "checkout" && <CheckoutPage cart={cart} total={cartTotal} step={checkoutStep} setStep={setCheckoutStep} navigate={navigate} setCart={setCart} orderPlaced={orderPlaced} setOrderPlaced={setOrderPlaced} placeOrder={placeOrder} placedOrder={placedOrder} customer={customer} />}
@@ -517,11 +571,11 @@ export default function App() {
           <div>
             <h4 style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24, fontWeight: 600 }}>Shop</h4>
             {[
-              { label: "New Arrivals", filter: "All" },
-              { label: "Bridal Lehengas", filter: "Bridal" },
-              { label: "Sarees", filter: "Sarees" },
-              { label: "Sherwanis", filter: "Sherwanis" },
-              { label: "Anarkali", filter: "Anarkali" },
+              { label: "New Arrivals", filter: "all" },
+              { label: "Bridal Lehengas", filter: "wedding-dresses" },
+              { label: "Sarees", filter: "sarees" },
+              { label: "Sherwanis", filter: "suits" },
+              { label: "Anarkali", filter: "suits" },
             ].map(l => (
               <div key={l.label} onClick={() => { setShopFilter(l.filter); navigate("shop"); }} style={{ fontSize: 13, color: "rgba(240,235,228,0.7)", marginBottom: 12, cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "rgba(240,235,228,0.7)"}>{l.label}</div>
             ))}
@@ -1310,10 +1364,12 @@ function ContactPage({ navigate }) {
 
 /* ─── DESIGN YOUR DREAM OUTFIT (Custom Design Studio) ─── */
 function DesignStudioPage({ navigate }) {
-  const [spec, setSpec] = useState({ email: "", garment: "", fabric: "", color: "", embroidery: "", occasion: "", budget: "" });
+  const [spec, setSpec] = useState({ name: "", email: "", phone: "", garment: "", fabric: "", color: "", embroidery: "", occasion: "", eventDate: "", budget: "" });
   const [images, setImages] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [designRef, setDesignRef] = useState("");
+  const [designError, setDesignError] = useState("");
+  const [sending, setSending] = useState(false);
 
   const addFiles = (fileList) => {
     const next = Array.from(fileList || []).map(f => ({ url: URL.createObjectURL(f), name: f.name, file: f }));
@@ -1331,32 +1387,55 @@ function DesignStudioPage({ navigate }) {
       spec.budget && `Budget: ${spec.budget}`,
       images.length ? `Inspiration images: ${images.length} (shared via WhatsApp)` : "",
     ].filter(Boolean);
-    // If the shopper is logged in and gave us at least one image + a garment,
-    // submit a real inspiration request so it lands in Medusa as a draft order
-    // (Admin → Orders) with the reference image(s). Guests fall through to the
-    // WhatsApp/email handoff below. Any failure degrades to that same fallback.
+    // Name, email and garment are all the backend needs, and the endpoint is
+    // public — so every request (guest or logged in) is recorded as a draft
+    // order in Medusa (Admin → Orders) and emailed to Sushma.
+    if (!spec.name.trim() || !/\S+@\S+\.\S+/.test(spec.email) || !spec.garment) {
+      setDesignError("Please add your name, a valid email, and the garment type.");
+      return;
+    }
+    setDesignError("");
+    setSending(true);
+
     let ref = "";
     const token = medusa.getToken();
     const files = images.map(im => im.file).filter(Boolean);
-    if (token && files.length && spec.garment) {
+
+    // Image upload requires a customer account (the upload route is
+    // authenticated). Guests still get their request recorded — they just
+    // share photos over WhatsApp instead.
+    let urls = [];
+    if (token && files.length) {
       try {
-        const urls = await medusa.uploadInspirationImages(files.slice(0, 3), token);
-        const extra = urls.slice(1);
-        const res = await medusa.createInspirationRequest({
-          image_url: urls[0],
-          garment_type: spec.garment,
-          fabric: spec.fabric || undefined,
-          color: spec.color || undefined,
-          embroidery: spec.embroidery || undefined,
-          occasion: spec.occasion || undefined,
-          budget: spec.budget || undefined,
-          notes: extra.length ? `Additional reference images:\n${extra.join("\n")}` : undefined,
-        }, token);
-        const displayId = res?.draft_order?.display_id;
-        if (displayId) ref = `CB-DSGN-${displayId}`;
+        urls = await medusa.uploadInspirationImages(files.slice(0, 5), token);
       } catch (e) {
-        console.warn("[Chaubandi] inspiration request not saved to Medusa (backend offline or not logged in?)", e);
+        console.warn("[Chaubandi] inspiration images not uploaded", e);
       }
+    }
+
+    try {
+      const res = await medusa.createCustomDesignRequest({
+        name: spec.name.trim(),
+        email: spec.email.trim(),
+        phone: spec.phone || undefined,
+        garment_type: spec.garment,
+        occasion: spec.occasion || undefined,
+        event_date: spec.eventDate || undefined,
+        budget_range: spec.budget || undefined,
+        notes: [
+          spec.fabric && `Fabric: ${spec.fabric}`,
+          spec.color && `Color: ${spec.color}`,
+          spec.embroidery && `Embroidery: ${spec.embroidery}`,
+          !urls.length && images.length ? `${images.length} inspiration image(s) to follow via WhatsApp` : "",
+        ].filter(Boolean).join("\n") || undefined,
+        image_urls: urls,
+      });
+      const displayId = res?.draft_order?.display_id;
+      if (displayId) ref = `CB-DSGN-${displayId}`;
+    } catch (e) {
+      console.warn("[Chaubandi] custom design request not saved (backend offline?)", e);
+    } finally {
+      setSending(false);
     }
 
     // Durable delivery: email the brief to the boutique if the shopper gave an
@@ -1379,9 +1458,9 @@ function DesignStudioPage({ navigate }) {
       images.length ? "\nI'll share my inspiration image(s) here in the chat." : "",
     ].filter(Boolean);
     try { window.open(`https://wa.me/18578001282?text=${encodeURIComponent(lines.join("\n"))}`, "_blank"); } catch { /* popup blocked */ }
-    // Show the real Medusa draft-order ref when we created one; otherwise a
-    // cosmetic placeholder for the WhatsApp/email path.
-    setDesignRef(ref || `CB-DSGN-${Math.floor(Math.random() * 9000) + 1000}`);
+    // Only ever show a reference number we actually created — a made-up one
+    // would be quoted back to Sushma and match nothing.
+    setDesignRef(ref);
     setSubmitted(true);
   };
 
@@ -1402,7 +1481,7 @@ function DesignStudioPage({ navigate }) {
           <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 470, margin: "0 auto 8px", lineHeight: 1.8 }}>
             Thank you! Sushma will personally review your custom {spec.garment ? spec.garment.toLowerCase() : "design"} request{spec.occasion ? ` for your ${spec.occasion.toLowerCase()}` : ""} and reach out within 24 hours to discuss fabrics, timeline, and pricing.
           </p>
-          <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Design Ref #{designRef}</p>
+          {designRef && <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Design Ref #{designRef}</p>}
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={() => navigate("home")} className="btn-shine" style={{ padding: "14px 36px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>
               Back to Home
@@ -1456,6 +1535,16 @@ function DesignStudioPage({ navigate }) {
 
         <div>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 400, marginBottom: 20, color: "#f0e6d2" }}>Design Specifications</h2>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={label}>Your Name</label>
+              <input value={spec.name} onChange={e => setSpec({ ...spec, name: e.target.value })} placeholder="Priya S." style={field} onFocus={onFocus} onBlur={onBlur} />
+            </div>
+            <div>
+              <label style={label}>Phone <span style={{ textTransform: "none", color: "#6e6353" }}>(optional)</span></label>
+              <input value={spec.phone} onChange={e => setSpec({ ...spec, phone: e.target.value })} placeholder="+1 555 0100" style={field} onFocus={onFocus} onBlur={onBlur} />
+            </div>
+          </div>
           <div style={{ marginBottom: 16 }}>
             <label style={label}>Your Email <span style={{ textTransform: "none", color: "#6e6353" }}>(so Sushma can reply)</span></label>
             <input type="email" value={spec.email} onChange={e => setSpec({ ...spec, email: e.target.value })} placeholder="you@example.com" style={field} onFocus={onFocus} onBlur={onBlur} />
@@ -1484,15 +1573,22 @@ function DesignStudioPage({ navigate }) {
             <label style={label}>Embroidery Notes</label>
             <textarea value={spec.embroidery} onChange={e => setSpec({ ...spec, embroidery: e.target.value })} placeholder="Zardozi borders, mirror work, pearl detailing…" rows={4} style={{ ...field, height: "auto", padding: "14px 16px", resize: "vertical", lineHeight: 1.6 }} onFocus={onFocus} onBlur={onBlur} />
           </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={label}>Budget Range</label>
-            <select value={spec.budget} onChange={e => setSpec({ ...spec, budget: e.target.value })} style={{ ...field, color: spec.budget ? "#f0e6d2" : "#6e6353", cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur}>
-              <option value="">Select…</option>
-              {["$300 – $500", "$500 – $800", "$800 – $1,200", "$1,200 – $2,000", "$2,000+"].map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+            <div>
+              <label style={label}>Budget Range</label>
+              <select value={spec.budget} onChange={e => setSpec({ ...spec, budget: e.target.value })} style={{ ...field, color: spec.budget ? "#f0e6d2" : "#6e6353", cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur}>
+                <option value="">Select…</option>
+                {["$300 – $500", "$500 – $800", "$800 – $1,200", "$1,200 – $2,000", "$2,000+"].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={label}>Event Date <span style={{ textTransform: "none", color: "#6e6353" }}>(optional)</span></label>
+              <input type="date" value={spec.eventDate} onChange={e => setSpec({ ...spec, eventDate: e.target.value })} style={{ ...field, cursor: "pointer" }} onFocus={onFocus} onBlur={onBlur} />
+            </div>
           </div>
-          <button onClick={submitDesign} className="btn-shine" style={{ width: "100%", height: 54, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>
-            Request Custom Design
+          {designError && <div style={{ fontSize: 12.5, color: "#e8a0a0", marginBottom: 12 }}>{designError}</div>}
+          <button onClick={submitDesign} disabled={sending} className="btn-shine" style={{ width: "100%", height: 54, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: sending ? "default" : "pointer", opacity: sending ? .6 : 1, fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 4 }}>
+            {sending ? "Sending…" : "Request Custom Design"}
           </button>
           <p style={{ fontSize: 12, color: "#6e6353", textAlign: "center", marginTop: 14, lineHeight: 1.6 }}>No payment now. Sushma reviews every request personally and replies within 24 hours.</p>
         </div>
@@ -1501,83 +1597,76 @@ function DesignStudioPage({ navigate }) {
   );
 }
 
-/* ─── FIND YOUR PERFECT FIT (Smart Measurements) ─── */
+/* ─── FIND YOUR PERFECT FIT (Measurement Chart) ─── */
+/* The customer enters their own measurements and we store them against their
+   account. We deliberately do NOT estimate sizes from photos: a guessed number
+   here becomes a real cut of fabric, so every value is one the customer (or
+   their tailor) actually measured, and Sushma confirms them before stitching. */
 function PerfectFitPage({ navigate, customer }) {
-  const [photos, setPhotos] = useState({ front: null, side: null });
-  const [height, setHeight] = useState("");
-  const [status, setStatus] = useState("idle");
-  const [saveState, setSaveState] = useState("idle"); // idle|saving|saved|guest|error
-
-  const setPhoto = (key, fileList) => {
-    const f = (fileList || [])[0];
-    if (f) setPhotos(prev => ({ ...prev, [key]: { url: URL.createObjectURL(f), name: f.name } }));
-  };
-
-  const MEASUREMENTS = [
-    ["Bust", "36 in"], ["Waist", "29 in"], ["Hips", "39 in"],
-    ["Shoulder", "15 in"], ["Sleeve Length", "23 in"], ["Blouse Length", "15 in"],
-    ["Lehenga Length", "41 in"], ["Inseam", "30 in"],
+  const GROUPS = [
+    { key: "general", title: "General" },
+    { key: "upper", title: "Upper Body" },
+    { key: "lower", title: "Lower Body" },
   ];
 
-  const calculate = () => {
-    setStatus("calculating");
-    setTimeout(async () => {
-      setStatus("done");
-      // For signed-in shoppers, persist the estimate to their profile so
-      // every future order can be tailored to it.
-      if (customer) {
-        setSaveState("saving");
-        try {
-          await medusa.saveMeasurements({
-            bust: 36, waist: 29, hips: 39, shoulder: 15, sleeve: 23, length: 15, inseam: 30,
-            unit: "in", notes: `Height: ${height || "not provided"} · estimated via Perfect Fit`,
-          });
-          setSaveState("saved");
-        } catch { setSaveState("error"); }
-      } else {
-        setSaveState("guest");
-      }
-    }, 2000);
+  const [unit, setUnit] = useState("in");
+  const [values, setValues] = useState({});
+  const [sleeveStyle, setSleeveStyle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  // Guests have nothing to fetch, so they never enter the loading state.
+  const [loading, setLoading] = useState(!!customer);
+  const [saveState, setSaveState] = useState("idle"); // idle|saving|saved|error
+  // Derived rather than stored: a signed-out visitor is always in guest mode.
+  const guest = !customer;
+
+  // Load the existing chart so returning customers edit rather than re-enter.
+  useEffect(() => {
+    let cancelled = false;
+    if (!customer) return;
+    medusa.getMeasurements()
+      .then((m) => {
+        if (cancelled || !m) return;
+        const next = {};
+        for (const f of medusa.MEASUREMENT_FIELDS) {
+          if (m[f.key] !== null && m[f.key] !== undefined) next[f.key] = String(m[f.key]);
+        }
+        setValues(next);
+        setUnit(m.unit || "in");
+        setSleeveStyle(m.sleeve_style || "");
+        setNotes(m.notes || "");
+        setConfirmed(!!m.confirmed);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [customer]);
+
+  const setField = (key, v) => setValues((s) => ({ ...s, [key]: v }));
+
+  const save = async () => {
+    if (guest) return;
+    setSaveState("saving");
+    const payload = { unit, sleeve_style: sleeveStyle || null, notes: notes || null };
+    for (const f of medusa.MEASUREMENT_FIELDS) {
+      const raw = values[f.key];
+      if (raw === undefined || raw === "") continue;
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) payload[f.key] = n;
+    }
+    try {
+      await medusa.saveMeasurements(payload);
+      setConfirmed(false); // any edit clears the owner's confirmation
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
   };
 
-  const silhouette = (side) => (
-    <svg viewBox="0 0 120 240" width="120" height="240" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", opacity: 0.16, pointerEvents: "none" }}>
-      <g fill="#c5a255">
-        <circle cx={side ? 54 : 60} cy="28" r="15" />
-        {side
-          ? <path d="M54 44 Q66 54 62 74 L84 214 Q54 224 40 210 L48 74 Q44 54 54 44 Z" />
-          : <path d="M60 44 L80 66 L98 214 Q60 226 22 214 L40 66 Z" />}
-      </g>
-    </svg>
-  );
+  const filledCount = medusa.MEASUREMENT_FIELDS.filter((f) => values[f.key]).length;
 
-  const uploadCard = (key, title, side) => {
-    const p = photos[key];
-    return (
-      <label style={{ position: "relative", display: "block", height: 300, border: `1.5px dashed ${p ? "#c5a255" : "#2b2218"}`, borderRadius: 10, background: "#16110c", cursor: "pointer", overflow: "hidden" }}>
-        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => setPhoto(key, e.target.files)} />
-        {p ? (
-          <>
-            <img src={p.url} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(13,10,8,0.8)", color: "#3dbd83", fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 100, display: "flex", alignItems: "center", gap: 6 }}>
-              <Check size={13} /> {title} added
-            </div>
-          </>
-        ) : (
-          <>
-            {silhouette(side)}
-            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, textAlign: "center", padding: 20 }}>
-              <div style={{ width: 46, height: 46, borderRadius: "50%", background: "#1f1812", border: "1px solid rgba(197,162,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5a255" strokeWidth="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>
-              </div>
-              <div style={{ fontSize: 14, color: "#f0e6d2", fontWeight: 500 }}>{title}</div>
-              <div style={{ fontSize: 12, color: "#6e6353" }}>Stand straight, align with the guide</div>
-            </div>
-          </>
-        )}
-      </label>
-    );
-  };
+  const label = { fontSize: 11, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6, textTransform: "uppercase" };
+  const field = { width: "100%", height: 46, border: "1px solid #2b2218", borderRadius: 4, padding: "0 14px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" };
 
   return (
     <div>
@@ -1586,63 +1675,86 @@ function PerfectFitPage({ navigate, customer }) {
           <div className="mobile-hide" style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)" }}>
             <button onClick={() => navigate("home")} style={{ padding: "10px 22px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", borderRadius: 4, cursor: "pointer", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>← Home</button>
           </div>
-          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>Smart Sizing</div>
+          <div style={{ fontSize: 10, letterSpacing: 4, color: "#c5a255", textTransform: "uppercase", marginBottom: 14 }}>Made To Measure</div>
           <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(36px,4.5vw,58px)", fontWeight: 300, color: "#f0e6d2", lineHeight: 1.1, marginBottom: 14 }}>Find Your <em style={{ color: "#c5a255" }}>Perfect Fit</em></h1>
-          <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 540, margin: "0 auto", lineHeight: 1.8 }}>Two quick photos and your height — we'll estimate your measurements so every piece is tailored just right.</p>
+          <p style={{ fontSize: 14, color: "#a3947c", maxWidth: 560, margin: "0 auto", lineHeight: 1.8 }}>Save your measurements once and every made-to-measure piece is cut to them. Fill in what you know — you can always add the rest later.</p>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "56px 32px 80px" }}>
-        <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-          {uploadCard("front", "Front view", false)}
-          {uploadCard("side", "Side view", true)}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "48px 32px 80px" }}>
+        {/* how to measure */}
+        <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: "20px 24px", marginBottom: 28 }}>
+          <div style={{ fontSize: 13.5, color: "#f0e6d2", fontWeight: 600, marginBottom: 8 }}>How to measure</div>
+          <p style={{ fontSize: 13, color: "#a3947c", lineHeight: 1.75, margin: 0 }}>
+            Use a soft measuring tape over close-fitting clothing, kept level and snug but not tight. If you already have a tailor&rsquo;s chart, copy the numbers straight across. Not sure about a field? Leave it blank — Sushma will confirm everything with you before cutting.
+          </p>
         </div>
 
-        <div className="mobile-stack" style={{ display: "flex", gap: 16, alignItems: "flex-end", marginBottom: 8 }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, display: "block", marginBottom: 6, textTransform: "uppercase" }}>Your Height</label>
-            <input value={height} onChange={e => setHeight(e.target.value)} placeholder={`e.g. 5'5" or 165 cm`} style={{ width: "100%", height: 52, border: "1px solid #2b2218", borderRadius: 4, padding: "0 16px", fontFamily: "'Outfit',sans-serif", fontSize: 14, outline: "none", background: "#16110c", color: "#f0e6d2" }} onFocus={e => e.target.style.borderColor = "#c5a255"} onBlur={e => e.target.style.borderColor = "#2b2218"} />
-          </div>
-          <button onClick={calculate} disabled={status === "calculating"} className="btn-shine" style={{ height: 52, padding: "0 40px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: status === "calculating" ? "default" : "pointer", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif", borderRadius: 4, opacity: status === "calculating" ? 0.75 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, whiteSpace: "nowrap" }}>
-            {status === "calculating"
-              ? <><span style={{ width: 16, height: 16, border: "2px solid rgba(26,18,8,0.35)", borderTopColor: "#1a1208", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} /> Calculating…</>
-              : (status === "done" ? "Recalculate" : "Calculate")}
-          </button>
+        {/* unit toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+          <span style={{ fontSize: 12, color: "#a3947c", letterSpacing: 1, textTransform: "uppercase" }}>Units</span>
+          {["in", "cm"].map((u) => (
+            <button key={u} onClick={() => setUnit(u)} style={{ padding: "7px 18px", borderRadius: 100, border: `1px solid ${unit === u ? "rgba(197,162,85,0.5)" : "#2b2218"}`, background: unit === u ? "#c5a255" : "transparent", color: unit === u ? "#1a1208" : "#a3947c", fontSize: 12, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>
+              {u === "in" ? "Inches" : "Centimetres"}
+            </button>
+          ))}
         </div>
-        <p style={{ fontSize: 12, color: "#6e6353", marginBottom: 36 }}>Your photos never leave your device — measurements are estimated locally for this demo.</p>
 
-        {status === "done" && (
-          <div className="fade-in" style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "24px 28px", borderBottom: "1px solid #2b2218", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: 3, color: "#c5a255", textTransform: "uppercase", marginBottom: 6 }}>Your Profile</div>
-                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, color: "#f0e6d2" }}>Estimated Measurements</h2>
-              </div>
-              <div style={{ background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", padding: "10px 20px", borderRadius: 100, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>Recommended Size · M</div>
-            </div>
-            <div style={{ padding: "8px 28px 20px" }}>
-              {MEASUREMENTS.map(([k, v], i) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: i < MEASUREMENTS.length - 1 ? "1px solid #2b2218" : "none" }}>
-                  <span style={{ fontSize: 14, color: "#a3947c" }}>{k}</span>
-                  <span style={{ fontSize: 16, color: "#f0e6d2", fontWeight: 600, fontFamily: "'Cormorant Garamond',serif" }}>{v}</span>
+        {loading ? (
+          <p style={{ fontSize: 13.5, color: "#a3947c" }}>Loading your measurements…</p>
+        ) : (
+          <>
+            {GROUPS.map((g) => (
+              <div key={g.key} style={{ marginBottom: 28 }}>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 400, color: "#f0e6d2", marginBottom: 14 }}>{g.title}</h2>
+                <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+                  {medusa.MEASUREMENT_FIELDS.filter((f) => f.group === g.key).map((f) => (
+                    <div key={f.key}>
+                      <label style={label}>{f.label}</label>
+                      <input inputMode="decimal" value={values[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} placeholder={unit} style={field}
+                        onFocus={(e) => (e.target.style.borderColor = "#c5a255")} onBlur={(e) => (e.target.style.borderColor = "#2b2218")} />
+                    </div>
+                  ))}
+                  {g.key === "upper" && (
+                    <div>
+                      <label style={label}>Sleeve Style</label>
+                      <select value={sleeveStyle} onChange={(e) => setSleeveStyle(e.target.value)} style={{ ...field, cursor: "pointer", color: sleeveStyle ? "#f0e6d2" : "#6e6353" }}>
+                        <option value="">Select…</option>
+                        {["Sleeveless", "Cap", "Short", "Elbow", "3/4", "Full"].map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-            <div style={{ background: "#1f1812", padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-              {saveState === "saved" && <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#3dbd83", fontWeight: 500 }}><Check size={16} /> Saved to your profile</span>}
-              {saveState === "saving" && <span style={{ fontSize: 13, color: "#a3947c", fontWeight: 500 }}>Saving to your profile…</span>}
-              {saveState === "error" && <span style={{ fontSize: 13, color: "#e8a0a0", fontWeight: 500 }}>Couldn’t save — please try again.</span>}
-              {saveState === "guest" && <span style={{ fontSize: 13, color: "#e8c97a", fontWeight: 500, cursor: "pointer" }} onClick={() => navigate("account")}>Sign in to save these to your profile →</span>}
-              <span style={{ fontSize: 12, color: "#6e6353" }}>We'll use these to tailor every order.</span>
-            </div>
-          </div>
-        )}
+              </div>
+            ))}
 
-        {status === "done" && (
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 32, flexWrap: "wrap" }}>
-            <button onClick={() => navigate("shop")} className="btn-shine" style={{ padding: "14px 36px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>Shop Your Size</button>
-            <button onClick={() => navigate("home")} style={{ padding: "14px 36px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>Back to Home</button>
-          </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={label}>Notes for Sushma</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Anything we should know — preferred fit, alterations you usually need…"
+                style={{ ...field, height: "auto", padding: "12px 14px", resize: "vertical", lineHeight: 1.6 }} />
+            </div>
+
+            <div style={{ background: "#16110c", border: "1px solid #2b2218", borderRadius: 10, padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, color: "#a3947c" }}>
+                {filledCount} of {medusa.MEASUREMENT_FIELDS.length} measurements filled in
+                {confirmed && <span style={{ color: "#3dbd83", marginLeft: 10 }}>✓ Confirmed by Chaubandi</span>}
+              </div>
+              <button onClick={guest ? () => navigate("account") : save} disabled={saveState === "saving"} className="btn-shine"
+                style={{ padding: "13px 34px", background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, cursor: saveState === "saving" ? "default" : "pointer", opacity: saveState === "saving" ? .6 : 1, fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontWeight: 700, fontFamily: "'Outfit',sans-serif" }}>
+                {saveState === "saving" ? "Saving…" : guest ? "Sign In To Save" : "Save Measurements"}
+              </button>
+            </div>
+
+            <div style={{ marginTop: 14, minHeight: 20 }}>
+              {saveState === "saved" && <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "#3dbd83" }}><Check size={16} /> Saved to your profile. Sushma will confirm these before stitching.</span>}
+              {saveState === "error" && <span style={{ fontSize: 13, color: "#e8a0a0" }}>Couldn&rsquo;t save — please try again.</span>}
+              {guest && <span style={{ fontSize: 13, color: "#e8c97a", cursor: "pointer" }} onClick={() => navigate("account")}>Sign in to save your measurements to your profile →</span>}
+            </div>
+
+            <div style={{ display: "flex", gap: 14, marginTop: 32, flexWrap: "wrap" }}>
+              <button onClick={() => navigate("shop")} style={{ padding: "14px 36px", background: "transparent", color: "#e8c97a", border: "1px solid rgba(197,162,85,0.5)", cursor: "pointer", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Outfit',sans-serif" }}>Continue Shopping</button>
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -1660,7 +1772,7 @@ function CategoryStrip({ navigate, setShopFilter, activeFilter }) {
       }}>
         {/* Notice 'image' was added to the destructured variables below */}
         {CATEGORY_STRIP.map(({ label, filter, color, image }) => {
-          const active = filter !== "All" && filter === activeFilter;
+          const active = filter !== "all" && filter === activeFilter;
           return (
             <div key={label} className="cat-item" onClick={() => { setShopFilter(filter); navigate("shop"); }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, cursor: "pointer", flexShrink: 0, minWidth: 72 }}>
@@ -2090,7 +2202,7 @@ function HomePage({ navigate, products, setShopFilter }) {
   return (
     <div>
       <HeroCarousel navigate={navigate} setShopFilter={setShopFilter} />
-      <CategoryStrip navigate={navigate} setShopFilter={setShopFilter} activeFilter="All" />
+      <CategoryStrip navigate={navigate} setShopFilter={setShopFilter} activeFilter="all" />
       <div style={{ background: "#16110c", borderBottom: "1px solid #2b2218", padding: "18px 32px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", justifyContent: "center", gap: 48, flexWrap: "wrap" }}>
           {[["✂️", "Free Alterations"], ["📦", "Free USA Shipping"], ["⭐", "4.9 Star Rating"], ["📍", "Visit Our Boutique"]].map(([icon, text]) => (
@@ -2113,7 +2225,7 @@ function HomePage({ navigate, products, setShopFilter }) {
             ["Wedding", "/images/Wedding.jpg", "#6a1830"], 
             ["Reception", "/images/Reception.jpg", "#1a1412"]
           ].map(([occ, imgSrc, color]) => (
-            <div key={occ} className="hover-lift" onClick={() => { setShopFilter("All"); navigate("shop"); }}
+            <div key={occ} className="hover-lift" onClick={() => { setShopFilter("all"); navigate("shop"); }}
               style={{ cursor: "pointer", borderRadius: 8, overflow: "hidden", position: "relative", aspectRatio: "3/4" }}>
               
               {/* Added image tag */}
@@ -2166,7 +2278,13 @@ function ProductCard({ product, navigate, inWishlist, toggleWishlist }) {
       <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 16, fontWeight: 400, marginBottom: 4, lineHeight: 1.3 }}>{product.name}</h3>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 14, color: "#a3947c" }}>${product.price}</span>
-        <span style={{ fontSize: 11, color: "#c5a255", letterSpacing: 1 }}>{"★".repeat(Math.floor(product.rating))} {product.rating}</span>
+        {/* Rating only renders once a real approved review exists — an unrated
+            product shows its style number instead of invented stars. */}
+        {typeof product.rating === "number" ? (
+          <span style={{ fontSize: 11, color: "#c5a255", letterSpacing: 1 }}>{"★".repeat(Math.round(product.rating))} {product.rating.toFixed(1)}</span>
+        ) : (
+          <span style={{ fontSize: 10.5, color: "#6e6353", letterSpacing: 1 }}>{product.styleNo || ""}</span>
+        )}
       </div>
     </div>
   );
@@ -2200,18 +2318,24 @@ const FABRIC_OPTS = [
   { label: "Banarasi", match: /banarasi/i },
   { label: "Net", match: /\bnet\b/i },
 ];
-const OCCASION_BY_CAT = {
-  Bridal: ["Wedding", "Reception"],
-  Lehengas: ["Wedding", "Sangeet", "Reception"],
-  Sarees: ["Reception", "Festive"],
-  Anarkali: ["Sangeet", "Mehandi", "Festive"],
-  Sharara: ["Sangeet", "Mehandi"],
-  Sherwanis: ["Wedding"],
+/* Fallback occasions for the hand-curated products, which have no
+   metadata.occasion. Seeded products carry their own, so this is only
+   consulted when the array is empty. */
+const OCCASION_BY_LEGACY_CAT = {
+  Bridal: ["bridal", "wedding-guest"],
+  Lehengas: ["bridal", "sangeet-mehendi"],
+  Sarees: ["wedding-guest", "festive"],
+  Anarkali: ["sangeet-mehendi", "festive"],
+  Sharara: ["sangeet-mehendi"],
+  Sherwanis: ["wedding-guest"],
 };
-const OCCASIONS = ["Wedding", "Reception", "Sangeet", "Mehandi", "Festive"];
+/* Occasion filter options, in the order the backend seeds the collections. */
+const OCCASIONS = Object.entries(OCCASION_LABELS).map(([handle, label]) => ({ handle, label }));
 const colorsOf = (p) => COLOR_SWATCHES.filter((c) => c.match.test(p.name || "")).map((c) => c.label);
 const fabricsOf = (p) => FABRIC_OPTS.filter((f) => f.match.test(`${p.desc || ""} ${p.name || ""}`)).map((f) => f.label);
-const occasionsOf = (p) => OCCASION_BY_CAT[p.cat] || ["Festive"];
+/** Occasion handles for a product: seeded metadata first, legacy map second. */
+const occasionsOf = (p) =>
+  (p.occasions?.length ? p.occasions : OCCASION_BY_LEGACY_CAT[p.cat]) || [];
 const isReadyToShip = (p) => (p.images?.length || 0) > 0;
 
 function FilterSection({ title, open, onToggle, children }) {
@@ -2238,7 +2362,15 @@ function CheckRow({ label, checked, onChange, swatch }) {
   );
 }
 
-function ShopPage({ navigate, products, filter, setFilter, addToCart, query = "", setQuery, inWishlist, toggleWishlist }) {
+function ShopPage({ navigate, products, categories = FALLBACK_CATEGORIES, filter, setFilter, addToCart, query = "", setQuery, inWishlist, toggleWishlist }) {
+  const categoryName = (handle) =>
+    categories.find((c) => c.handle === handle)?.name || handle;
+
+  // Only offer categories that actually contain something. Keeps retired
+  // categories (e.g. an empty "kids" left over from an earlier seed) out of
+  // the chip row without needing to delete them in admin.
+  const stocked = new Set(products.map(categoryOf).filter(Boolean));
+  const shownCategories = categories.filter((c) => stocked.has(c.handle));
   const q = query.trim().toLowerCase();
   const [sort, setSort] = useState("trending");
   const [sel, setSel] = useState({ sizes: [], prices: [], colors: [], occasions: [], fabrics: [], ready: false });
@@ -2253,8 +2385,8 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart, query = ""
   const colors = COLOR_SWATCHES.filter((c) => products.some((p) => c.match.test(p.name || "")));
   const fabrics = FABRIC_OPTS.filter((f) => products.some((p) => f.match.test(`${p.desc || ""} ${p.name || ""}`)));
 
-  const byCat = filter === "All" ? products : products.filter((p) => p.cat === filter);
-  let list = byCat.filter((p) => !q || [p.name, p.cat, p.desc, p.badge].filter(Boolean).some((v) => v.toLowerCase().includes(q)));
+  const byCat = filter === "all" ? products : products.filter((p) => categoryOf(p) === filter);
+  let list = byCat.filter((p) => !q || [p.name, p.cat, p.styleNo, p.desc, p.badge].filter(Boolean).some((v) => v.toLowerCase().includes(q)));
   list = list.filter((p) => !sel.sizes.length || (p.sizes || []).some((s) => sel.sizes.includes(s)));
   list = list.filter((p) => !sel.prices.length || sel.prices.some((lbl) => PRICE_BUCKETS.find((b) => b.label === lbl)?.test(p.price)));
   list = list.filter((p) => !sel.colors.length || colorsOf(p).some((c) => sel.colors.includes(c)));
@@ -2268,7 +2400,7 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart, query = ""
   else if (sort === "price-high") sorted.sort((a, b) => b.price - a.price);
   else if (sort === "price-low") sorted.sort((a, b) => a.price - b.price);
 
-  const heading = q ? `Results for “${query.trim()}”` : (filter === "All" ? "All Collections" : filter);
+  const heading = q ? `Results for “${query.trim()}”` : (filter === "all" ? "All Collections" : categoryName(filter));
 
   const sidebarInner = (
     <>
@@ -2286,7 +2418,7 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart, query = ""
         {colors.map((c) => <CheckRow key={c.label} label={c.label} swatch={c.hex} checked={sel.colors.includes(c.label)} onChange={() => toggle("colors", c.label)} />)}
       </FilterSection>
       <FilterSection title="Occasion" open={open.Occasion} onToggle={() => setOpen((o) => ({ ...o, Occasion: !o.Occasion }))}>
-        {OCCASIONS.map((oc) => <CheckRow key={oc} label={oc} checked={sel.occasions.includes(oc)} onChange={() => toggle("occasions", oc)} />)}
+        {OCCASIONS.map((oc) => <CheckRow key={oc.handle} label={oc.label} checked={sel.occasions.includes(oc.handle)} onChange={() => toggle("occasions", oc.handle)} />)}
       </FilterSection>
       <FilterSection title="Fabric" open={open.Fabric} onToggle={() => setOpen((o) => ({ ...o, Fabric: !o.Fabric }))}>
         {fabrics.map((f) => <CheckRow key={f.label} label={f.label} checked={sel.fabrics.includes(f.label)} onChange={() => toggle("fabrics", f.label)} />)}
@@ -2301,7 +2433,7 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart, query = ""
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 32px 80px" }}>
       <div className="fade-in" style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: "#a3947c", marginBottom: 8 }}>
-          <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span>Shop</span> {filter !== "All" && <>/ <span>{filter}</span></>}
+          <span style={{ cursor: "pointer" }} onClick={() => navigate("home")}>Home</span> / <span>Shop</span> {filter !== "all" && <>/ <span>{categoryName(filter)}</span></>}
         </div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 36, fontWeight: 400, marginBottom: 8 }}>{heading}</h1>
       </div>
@@ -2309,10 +2441,10 @@ function ShopPage({ navigate, products, filter, setFilter, addToCart, query = ""
       {/* category chips */}
       <div className="fade-in d1" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         <Filter size={16} style={{ color: "#a3947c", marginRight: 8 }} />
-        {CATEGORIES.map((c) => (
-          <button key={c} onClick={() => setFilter(c)}
-            style={{ padding: "8px 18px", borderRadius: 100, border: `1px solid ${c === filter ? "rgba(197,162,85,0.5)" : "#2b2218"}`, background: c === filter ? "#c5a255" : "transparent", color: c === filter ? "#1a1208" : "#a3947c", fontSize: 12, cursor: "pointer", letterSpacing: .5, fontFamily: "'Outfit',sans-serif", transition: "all .3s" }}>
-            {c}
+        {[{ handle: "all", name: "All" }, ...shownCategories].map((c) => (
+          <button key={c.handle} onClick={() => setFilter(c.handle)}
+            style={{ padding: "8px 18px", borderRadius: 100, border: `1px solid ${c.handle === filter ? "rgba(197,162,85,0.5)" : "#2b2218"}`, background: c.handle === filter ? "#c5a255" : "transparent", color: c.handle === filter ? "#1a1208" : "#a3947c", fontSize: 12, cursor: "pointer", letterSpacing: .5, fontFamily: "'Outfit',sans-serif", transition: "all .3s" }}>
+            {c.name}
           </button>
         ))}
       </div>
@@ -2398,31 +2530,53 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* per-product reviews — stored locally until the backend gets a reviews
-     module; seeded with the product's static count so it never looks empty */
-  const revKey = `cb_reviews_${product.id}`;
-  const [userReviews, setUserReviews] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(revKey) || "[]"); } catch { return []; }
-  });
-  useEffect(() => {
-    try { setUserReviews(JSON.parse(localStorage.getItem(`cb_reviews_${product.id}`) || "[]")); } catch { setUserReviews([]); }
-  }, [product.id]);
+  /* Per-product reviews from the backend. Only approved reviews come back, so
+     a new product legitimately shows none — we say "no reviews yet" rather
+     than invent a rating. Submissions are held for the owner's approval. */
+  const [userReviews, setUserReviews] = useState([]);
+  const [avgRating, setAvgRating] = useState(null);
   const [showRevForm, setShowRevForm] = useState(false);
   const [revForm, setRevForm] = useState({ name: "", rating: 5, title: "", text: "" });
   const [revError, setRevError] = useState("");
-  const submitReview = () => {
+  const [revNotice, setRevNotice] = useState("");
+  const [revSaving, setRevSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUserReviews([]);
+    setAvgRating(null);
+    setRevNotice("");
+    medusa
+      .getProductReviews(product.productId || product.id)
+      .then((d) => {
+        if (cancelled) return;
+        setUserReviews(d.reviews || []);
+        setAvgRating(typeof d.average === "number" ? d.average : null);
+      })
+      .catch(() => {/* backend unreachable — leave the empty state */});
+    return () => { cancelled = true; };
+  }, [product.productId, product.id]);
+
+  const submitReview = async () => {
     if (!revForm.name.trim() || !revForm.text.trim()) { setRevError("Please add your name and review."); return; }
-    const entry = { ...revForm, date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }) };
-    const next = [entry, ...userReviews];
-    setUserReviews(next);
-    try { localStorage.setItem(revKey, JSON.stringify(next)); } catch { /* ignore */ }
-    setShowRevForm(false);
-    setRevForm({ name: "", rating: 5, title: "", text: "" });
+    setRevSaving(true);
     setRevError("");
+    try {
+      await medusa.submitProductReview(product.productId || product.id, {
+        customer_name: revForm.name.trim(),
+        rating: revForm.rating,
+        title: revForm.title.trim() || undefined,
+        body: revForm.text.trim(),
+      });
+      setShowRevForm(false);
+      setRevForm({ name: "", rating: 5, title: "", text: "" });
+      setRevNotice("Thank you — your review will appear once Sushma has approved it.");
+    } catch {
+      setRevError("Sorry, we couldn't submit your review. Please try again.");
+    } finally {
+      setRevSaving(false);
+    }
   };
-  const avgRating = userReviews.length
-    ? (userReviews.reduce((s, r) => s + r.rating, 0) / userReviews.length)
-    : product.rating;
 
   /* real, purchasable sizes for this product (each maps to a Medusa variant) */
   const ALL_SIZES = product.sizes?.length ? product.sizes : ["XS","S","M","L","XL","XXL"];
@@ -2552,8 +2706,12 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
         <div>
           <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 400, color: "#f0e6d2", lineHeight: 1.2, marginBottom: 6 }}>{product.name}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-            <span style={{ fontSize: 11, color: "#6e6353", letterSpacing: 1 }}>CB-{String(product.id).slice(-4).padStart(4, "0").toUpperCase()}</span>
-            <span style={{ fontSize: 12, color: "#c5a255" }}>{"★".repeat(Math.round(avgRating))} {avgRating.toFixed(1)}{userReviews.length ? ` (${userReviews.length})` : ""}</span>
+            {/* Seeded products carry a real style number; fall back to a short
+                code derived from the id for the hand-curated ones. */}
+            <span style={{ fontSize: 11, color: "#6e6353", letterSpacing: 1 }}>{product.styleNo || `CB-${String(product.id).slice(-4).padStart(4, "0").toUpperCase()}`}</span>
+            {typeof avgRating === "number" && (
+              <span style={{ fontSize: 12, color: "#c5a255" }}>{"★".repeat(Math.round(avgRating))} {avgRating.toFixed(1)} ({userReviews.length})</span>
+            )}
           </div>
           <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, color: "#f0e6d2", marginBottom: 6 }}>${product.price}</div>
           <p style={{ fontSize: 12.5, color: "#a3947c", marginBottom: 22, lineHeight: 1.6 }}>Free U.S. shipping · Free 14-day returns · Free alterations included.</p>
@@ -2674,9 +2832,18 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
         <div style={{ textAlign: "center", marginBottom: 26 }}>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 28, fontWeight: 400, color: "#f0e6d2", marginBottom: 8 }}>Customer Reviews</h2>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
-            <span style={{ color: "#e8c97a", letterSpacing: 2, fontSize: 16 }}>{"★".repeat(Math.round(avgRating))}{"☆".repeat(5 - Math.round(avgRating))}</span>
-            <span style={{ fontSize: 13.5, color: "#a3947c" }}>{avgRating.toFixed(1)} · {userReviews.length ? `${userReviews.length} review${userReviews.length > 1 ? "s" : ""}` : "Be the first to review this piece"}</span>
+            {typeof avgRating === "number" ? (
+              <>
+                <span style={{ color: "#e8c97a", letterSpacing: 2, fontSize: 16 }}>{"★".repeat(Math.round(avgRating))}{"☆".repeat(5 - Math.round(avgRating))}</span>
+                <span style={{ fontSize: 13.5, color: "#a3947c" }}>{avgRating.toFixed(1)} · {userReviews.length} review{userReviews.length > 1 ? "s" : ""}</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 13.5, color: "#a3947c" }}>No reviews yet — be the first to review this piece</span>
+            )}
           </div>
+          {revNotice && (
+            <div style={{ fontSize: 13, color: "#3dbd83", marginBottom: 12 }}>{revNotice}</div>
+          )}
           {!showRevForm && (
             <button onClick={() => setShowRevForm(true)} style={{ padding: "11px 26px", background: "#f0e6d2", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 700, letterSpacing: 1, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>✏️ Write a Review</button>
           )}
@@ -2700,21 +2867,29 @@ function ProductPage({ product, navigate, addToCart, products, inWishlist, toggl
             <textarea value={revForm.text} onChange={e => setRevForm(f => ({ ...f, text: e.target.value }))} placeholder="Share your experience — fit, fabric, the occasion you wore it for…" rows={4}
               style={{ width: "100%", border: "1px solid #2b2218", borderRadius: 4, padding: "12px 14px", fontFamily: "'Outfit',sans-serif", fontSize: 13.5, outline: "none", background: "#0d0a08", color: "#f0e6d2", resize: "vertical", marginBottom: 10, lineHeight: 1.6 }} />
             {revError && <div style={{ fontSize: 12, color: "#e8a0a0", marginBottom: 10 }}>{revError}</div>}
-            <button onClick={submitReview} style={{ width: "100%", height: 46, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>Submit Review</button>
+            <button onClick={submitReview} disabled={revSaving} style={{ width: "100%", height: 46, background: "linear-gradient(135deg,#d4af61,#a8842f)", color: "#1a1208", border: "none", borderRadius: 4, fontSize: 12.5, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, cursor: revSaving ? "default" : "pointer", opacity: revSaving ? .6 : 1, fontFamily: "'Outfit',sans-serif" }}>{revSaving ? "Submitting…" : "Submit Review"}</button>
+            <p style={{ fontSize: 11.5, color: "#6e6353", textAlign: "center", marginTop: 10, lineHeight: 1.6 }}>Reviews are read and published by Sushma, so yours may take a day or two to appear.</p>
           </div>
         )}
 
         {userReviews.length > 0 && (
           <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            {userReviews.map((r, i) => (
-              <div key={i} style={{ borderBottom: "1px solid #2b2218", padding: "18px 0" }}>
+            {userReviews.map((r) => (
+              <div key={r.id} style={{ borderBottom: "1px solid #2b2218", padding: "18px 0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ color: "#e8c97a", fontSize: 13, letterSpacing: 1.5 }}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
-                  <span style={{ fontSize: 12, color: "#6e6353" }}>{r.date}</span>
+                  <span style={{ fontSize: 12, color: "#6e6353" }}>
+                    {new Date(r.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </span>
                 </div>
                 {r.title && <div style={{ fontSize: 14.5, fontWeight: 700, color: "#f0e6d2", marginBottom: 5 }}>{r.title}</div>}
-                <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.65, marginBottom: 8 }}>{r.text}</p>
-                <div style={{ fontSize: 12.5, color: "#f0e6d2", fontWeight: 600 }}>{r.name} <span style={{ color: "#3dbd83", fontWeight: 400, marginLeft: 6 }}>✓ Verified</span></div>
+                <p style={{ fontSize: 13.5, color: "#a3947c", lineHeight: 1.65, marginBottom: 8 }}>{r.body}</p>
+                <div style={{ fontSize: 12.5, color: "#f0e6d2", fontWeight: 600 }}>
+                  {r.customer_name}
+                  {/* "Verified" is only claimed when the review came from a
+                      logged-in customer account, never for guest submissions. */}
+                  {r.customer_id && <span style={{ color: "#3dbd83", fontWeight: 400, marginLeft: 6 }}>✓ Verified</span>}
+                </div>
               </div>
             ))}
           </div>

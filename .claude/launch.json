@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "chaubandi-dev",
-      "runtimeExecutable": "C:\\node.exe",
-      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5173"],
+      "name": "storefront",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
       "port": 5173
     }
   ]

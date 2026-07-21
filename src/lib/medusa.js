@@ -37,13 +37,30 @@ export async function getRegionId() {
 }
 
 // ─── Products ───
-// Maps a Medusa product into the shape App.jsx already expects, pulling
-// presentation fields (cat/badge/color/images/rating/reviews) from metadata.
+// Default card gradient, used when a product has no photography yet.
+const DEFAULT_SWATCH = "linear-gradient(140deg,#2a1f2d,#4a2040 60%,#1a1412)";
+
+// Maps a Medusa product into the shape App.jsx expects.
+//
+// Presentation fields come from the seeded metadata contract (see
+// docs/API.md in the backend): `category` is the canonical handle,
+// `style_no`, `pack_contains`, `can_can`, `style_tips`, `fit_tips` and
+// `customizable` drive the PDP detail tabs.
+//
+// Ratings are deliberately NOT read from metadata: real ratings come from
+// /store/products/:id/reviews and are null until a review is approved. A
+// product with no reviews must render as "no reviews yet", never as a
+// default star count.
 function mapProduct(p) {
   const md = p.metadata || {};
   const variants = (p.variants || []).map((v) => ({ id: v.id, title: v.title }));
   const firstPrice = p.variants?.[0]?.calculated_price?.calculated_amount;
+
+  // Real Medusa images first; fall back to metadata.images for the older
+  // hand-curated products that stored local /Products/... paths there.
+  const images = (p.images || []).map((img) => img.url).filter(Boolean);
   const mdImages = Array.isArray(md.images) ? md.images : [];
+
   return {
     id: p.id,
     productId: p.id,
@@ -51,12 +68,29 @@ function mapProduct(p) {
     name: p.title,
     desc: p.description || "",
     price: typeof firstPrice === "number" ? firstPrice : Number(md.price) || 0,
-    cat: md.cat || "All",
+    // Canonical category handle (e.g. "lehengas"); `cat` is the legacy
+    // display-name field kept for the hand-curated products.
+    category: md.category || null,
+    cat: md.cat || null,
+    occasions: Array.isArray(md.occasion) ? md.occasion : [],
+    collectionHandle: p.collection?.handle || null,
     badge: md.badge || undefined,
-    color: md.color || "linear-gradient(140deg,#2a1f2d,#4a2040 60%,#1a1412)",
-    images: mdImages,
-    rating: typeof md.rating === "number" ? md.rating : Number(md.rating) || 4.8,
-    reviews: typeof md.reviews === "number" ? md.reviews : Number(md.reviews) || 0,
+    color: md.color || DEFAULT_SWATCH,
+    images: images.length ? images : mdImages,
+    isPlaceholder: md.placeholder === true,
+    // PDP detail fields
+    styleNo: md.style_no || null,
+    fabric: md.fabric || null,
+    work: md.work || null,
+    packContains: md.pack_contains || null,
+    canCan: md.can_can || null,
+    styleTips: md.style_tips || null,
+    fitTips: md.fit_tips || null,
+    care: md.care || null,
+    customizable: md.customizable === true,
+    // Populated on demand by loadProductReviews(); null means "not loaded".
+    rating: null,
+    reviews: 0,
     sizes: variants.map((v) => v.title),
     variants,
   };
@@ -65,9 +99,46 @@ function mapProduct(p) {
 export async function listProducts() {
   const regionId = await getRegionId();
   const { products } = await api(
-    `/store/products?limit=100&region_id=${regionId}&fields=+metadata,*variants.calculated_price`
+    `/store/products?limit=300&region_id=${regionId}&fields=+metadata,*variants.calculated_price,*images,*collection`
   );
   return products.map(mapProduct);
+}
+
+// ─── Categories & occasion collections ───
+// The 10 canonical categories and 6 occasion collections are created by the
+// backend seed; the storefront reads them rather than hardcoding a list, so
+// adding a category is a backend-only change.
+export async function listCategories() {
+  const { product_categories } = await api(
+    "/store/product-categories?limit=50&fields=id,name,handle,rank"
+  );
+  return (product_categories || [])
+    .slice()
+    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+    .map((c) => ({ id: c.id, name: c.name, handle: c.handle }));
+}
+
+export async function listCollections() {
+  const { collections } = await api("/store/collections?limit=50");
+  return (collections || []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    handle: c.handle,
+  }));
+}
+
+// ─── Product reviews ───
+// Approved reviews only. `average` is null when there are none — callers must
+// render "no reviews yet" rather than substituting a number.
+export async function getProductReviews(productId) {
+  return api(`/store/products/${productId}/reviews`);
+}
+
+export async function submitProductReview(productId, { customer_name, rating, title, body }) {
+  return api(`/store/products/${productId}/reviews`, {
+    method: "POST",
+    body: { customer_name, rating, title, body },
+  });
 }
 
 // ─── Cart ───
@@ -251,17 +322,50 @@ export async function listCustomerOrders(token = getToken()) {
   return res.orders || [];
 }
 
+// ─── Measurements (Lashkaraa field set) ───
+// One chart per customer. Any subset of fields may be sent; omitted fields
+// keep their stored value, so a single number can be saved on its own.
+export const MEASUREMENT_FIELDS = [
+  { key: "height", label: "Height", group: "general" },
+  { key: "bust", label: "Bust", group: "upper" },
+  { key: "above_waist", label: "Above Waist", group: "upper" },
+  { key: "waist", label: "Waist", group: "upper" },
+  { key: "hips", label: "Hips", group: "upper" },
+  { key: "shoulder_width", label: "Shoulder Width", group: "upper" },
+  { key: "armhole", label: "Armhole", group: "upper" },
+  { key: "bicep", label: "Bicep", group: "upper" },
+  { key: "sleeve_length", label: "Sleeve Length", group: "upper" },
+  { key: "front_neck_depth", label: "Front Neck Depth", group: "upper" },
+  { key: "back_neck_depth", label: "Back Neck Depth", group: "upper" },
+  { key: "top_length", label: "Top Length", group: "upper" },
+  { key: "bottom_length_skirt", label: "Skirt Length", group: "lower" },
+  { key: "bottom_length_pant", label: "Pant Length", group: "lower" },
+  { key: "thigh", label: "Thigh", group: "lower" },
+  { key: "knee", label: "Knee", group: "lower" },
+  { key: "ankle", label: "Ankle", group: "lower" },
+];
+
+export async function getMeasurements(token = getToken()) {
+  if (!token) return null;
+  const res = await api("/store/customers/me/measurements", { token });
+  return res.measurement;
+}
+
 // Save (or update) the customer's measurements to their profile.
 export async function saveMeasurements(data, token = getToken()) {
   if (!token) throw new Error("auth required");
-  const res = await api("/store/measurements", { method: "POST", body: data, token });
+  const res = await api("/store/customers/me/measurements", {
+    method: "POST",
+    body: data,
+    token,
+  });
   return res.measurement;
 }
 
 // ─── Custom-design inspiration ───
 // Upload inspiration image files (multipart) for a logged-in customer.
 // Returns an array of hosted URLs. Requires a customer token — the backend
-// caps this at 3 images x 10MB and only accepts JPEG/PNG/WebP/HEIC.
+// caps this at 5 images x 10MB and only accepts JPEG/PNG/WebP/HEIC.
 export async function uploadInspirationImages(files, token = getToken()) {
   if (!token) throw new Error("auth required");
   const form = new FormData();
@@ -284,12 +388,49 @@ export async function uploadInspirationImages(files, token = getToken()) {
   return (created || []).map((f) => f.url);
 }
 
-// Create a custom-design inspiration request. Creates a draft order in Medusa
-// (visible in Admin → Orders) carrying the reference image + design specs.
-// Requires image_url and garment_type; requires a logged-in customer.
-export async function createInspirationRequest(payload, token = getToken()) {
+// Create a custom-design request. Creates a draft order in Medusa (visible in
+// Admin → Orders) carrying the contact details, design specs and reference
+// images, and emails Sushma.
+//
+// Public: no login required. A logged-in customer is linked automatically when
+// a token is present.
+// payload: { name, email, garment_type, phone?, occasion?, event_date?,
+//            budget_range?, notes?, image_urls?: string[] }
+export async function createCustomDesignRequest(payload, token = getToken()) {
+  return api("/store/custom-design-requests", {
+    method: "POST",
+    body: payload,
+    ...(token ? { token } : {}),
+  });
+}
+
+// Legacy name, kept so older call sites keep working.
+export const createInspirationRequest = createCustomDesignRequest;
+
+// ─── Appointments ───
+// Bookable days for a month, for greying out dates in the picker.
+// month: "YYYY-MM" → { month, timezone, days: [{ date, available, ... }] }
+export async function getAppointmentAvailability(month) {
+  return api(`/store/appointments/availability?month=${month}`);
+}
+
+// Individual time slots for a date range.
+export async function getAppointmentSlots(startDate, weeks = 4) {
+  const qs = new URLSearchParams();
+  if (startDate) qs.set("start_date", startDate);
+  if (weeks) qs.set("weeks", String(weeks));
+  const { slots } = await api(`/store/appointments/slots?${qs}`);
+  return slots;
+}
+
+export async function bookAppointment({ requested_date, time_slot, notes }, token = getToken()) {
   if (!token) throw new Error("auth required");
-  return api("/store/inspiration", { method: "POST", body: payload, token });
+  const res = await api("/store/appointments", {
+    method: "POST",
+    body: { requested_date, time_slot, notes },
+    token,
+  });
+  return res.appointment;
 }
 
 // Link the logged-in customer to their active cart so the order is tied to
