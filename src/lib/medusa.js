@@ -63,6 +63,19 @@ function absoluteUrl(url) {
   }
 }
 
+// Hand-curated photography for specific SKUs, served from the storefront's own
+// /public/images folder. Used until the backend catalog carries real photos —
+// these win over the seeded placeholder SVGs. Keyed by style_no.
+const PHOTO_OVERRIDES = {
+  "CH-LEH-007": ["/images/Leh%201.jpg", "/images/Leh%202.jpg", "/images/Leh%203.jpg"],
+};
+
+// A seeded product with only placeholder art (the R2 placeholder SVGs) should
+// yield to a hand-curated override.
+function isPlaceholderImages(urls) {
+  return urls.length > 0 && urls.every((u) => /\/placeholder-/.test(u));
+}
+
 // Maps a Medusa product into the shape App.jsx expects.
 //
 // Presentation fields come from the seeded metadata contract (see
@@ -83,6 +96,7 @@ function mapProduct(p) {
   // hand-curated products that stored local /Products/... paths there.
   const images = (p.images || []).map((img) => absoluteUrl(img.url)).filter(Boolean);
   const mdImages = Array.isArray(md.images) ? md.images : [];
+  const override = PHOTO_OVERRIDES[md.style_no];
 
   return {
     id: p.id,
@@ -99,7 +113,12 @@ function mapProduct(p) {
     collectionHandle: p.collection?.handle || null,
     badge: md.badge || undefined,
     color: md.color || DEFAULT_SWATCH,
-    images: images.length ? images : mdImages,
+    images:
+      override && (images.length === 0 || isPlaceholderImages(images))
+        ? override
+        : images.length
+        ? images
+        : mdImages,
     isPlaceholder: md.placeholder === true,
     // PDP detail fields
     styleNo: md.style_no || null,
